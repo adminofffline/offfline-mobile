@@ -1,0 +1,41 @@
+# OSX
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# React Native / Metro
+.metro-health-check*
+
+# Android
+android/.gradle
+android/app/build
+android/build
+android/captures
+android/.cxx
+android/*.iml
+android/app/*.iml
+*.apk
+*.aab
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Podfile.lock
+
+# Environment
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temp
+.expo/
+*.log
