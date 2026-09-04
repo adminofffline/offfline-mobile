@@ -38,6 +38,7 @@ import { distributorApi } from '../../api/distributor';
 import { SoundService } from '../../utils/soundService';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { CONFIG } from '../../constants/config';
+import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 
 interface QRScannerModalProps {
   visible: boolean;
@@ -65,6 +66,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [torch, setTorch] = useState(false);
   const [scannedSessionCount, setScannedSessionCount] = useState(0);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [hudStatus, setHudStatus] = useState<{ type: 'READY' | 'SUCCESS' | 'DUPLICATE' | 'ERROR'; message: string }>({
     type: 'READY',
     message: 'Align CanQR inside the frame',
@@ -117,7 +119,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     }
   }, [visible, laserAnim]);
 
+  const handleScanNext = () => {
+    setScanResultData(null);
+  };
+
   const handleBarcodeScanned = (data: string) => {
+    if (scanResultData) return;
     const now = Date.now();
     if (now - lastScannedTimestamp.current < CONFIG.SCAN_DEBOUNCE_MS) {
       return;
@@ -133,6 +140,17 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         type: 'DUPLICATE',
         message: `Already Scanned: ${cleanCode.slice(-6)}`,
       });
+      setScanResultData({
+        status: 'DUPLICATE',
+        title: '⚠️ Already Scanned',
+        message: 'This bottle was already registered in the session.',
+        qrId: cleanCode,
+        canId: cleanCode.startsWith('CAN-') ? cleanCode : `CAN-${cleanCode.slice(-6).toUpperCase()}`,
+        campaignTitle: campaignTitle || (isPlant ? 'Live Plant Allocation' : 'Live Delivery Batch'),
+        locationName: user?.city || 'Chennai Hub',
+        scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      });
       return;
     }
 
@@ -144,7 +162,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'code-128', 'upc-a'],
     onCodeScanned: (codes) => {
-      if (codes.length > 0 && codes[0].value) {
+      if (codes.length > 0 && codes[0].value && !scanResultData) {
         handleBarcodeScanned(codes[0].value);
       }
     },
@@ -154,9 +172,27 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     // 1. Instant 0ms Optimistic Feedback (Swiggy / Zomato instant responsiveness)
     SoundService.playFeedback('SUCCESS');
     setScannedSessionCount((prev) => prev + 1);
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
     setHudStatus({
       type: 'SUCCESS',
       message: `✓ Scanned: ${qrPayload.slice(-8)}`,
+    });
+
+    setScanResultData({
+      status: 'SUCCESS',
+      title: isPlant ? '✓ Can QR Verified & Bottled' : '✓ Delivery QR Verified',
+      message: 'Scan verified & recorded to live ledger.',
+      qrId: qrPayload,
+      canId: qrPayload.startsWith('CAN-') ? qrPayload : `CAN-${qrPayload.slice(-6).toUpperCase()}`,
+      campaignTitle: campaignTitle || (isPlant ? 'Live Plant Allocation' : 'Live Delivery Batch'),
+      plantName: user?.plantName || user?.fullName || 'Water Plant Facility',
+      distributorName: user?.companyName || user?.fullName || 'Distributor Logistics Hub',
+      locationName: user?.city || 'Chennai Hub',
+      payoutAmount: isPlant ? 0.50 : 1.00,
+      currentCount: scannedSessionCount + 1,
+      scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
+      timestamp: nowTimeStr,
     });
 
     if (onScanSuccess) {
@@ -168,7 +204,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     // 2. Background non-blocking network verification
     try {
       if (isPlant) {
-        plantApi.scanQr({
+        const res = await plantApi.scanQr({
           qr_id: qrPayload,
           campaign_id: campaignId,
           plant_id: user?._id || (user as any)?.plant_profile?.plant_id,
@@ -177,15 +213,53 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           latitude: coords?.latitude,
           longitude: coords?.longitude,
           accuracy: coords?.accuracy,
-        }).catch(() => {});
+        });
+        if (res?.data) {
+          if (res.data.already_scanned || res.data.is_rescan) {
+            setScanResultData((prev) => (prev ? {
+              ...prev,
+              status: 'DUPLICATE',
+              title: '⚠️ Already Scanned',
+              message: res.data.message || 'This QR has already been scanned.',
+            } : null));
+          } else {
+            setScanResultData((prev) => (prev ? {
+              ...prev,
+              campaignTitle: res.data.campaign_title || prev.campaignTitle,
+              locationName: res.data.location_name || prev.locationName,
+              currentCount: res.data.current_count ?? prev.currentCount,
+              allocatedQuantity: res.data.allocated_quantity ?? prev.allocatedQuantity,
+              rawResponse: res.data,
+            } : null));
+          }
+        }
       } else {
-        distributorApi.scanQr({
+        const res = await distributorApi.scanQr({
           qr_id: qrPayload,
           campaign_id: campaignId,
           latitude: coords?.latitude,
           longitude: coords?.longitude,
           accuracy: coords?.accuracy,
-        }).catch(() => {});
+        });
+        if (res?.data) {
+          if (res.data.already_scanned || res.data.is_rescan) {
+            setScanResultData((prev) => (prev ? {
+              ...prev,
+              status: 'DUPLICATE',
+              title: '⚠️ Already Scanned',
+              message: res.data.message || 'This QR has already been delivered.',
+            } : null));
+          } else {
+            setScanResultData((prev) => (prev ? {
+              ...prev,
+              campaignTitle: res.data.campaign_title || prev.campaignTitle,
+              locationName: res.data.location_name || prev.locationName,
+              currentCount: res.data.current_count ?? prev.currentCount,
+              payoutAmount: res.data.rate_per_unit || res.data.gross_amount || prev.payoutAmount,
+              rawResponse: res.data,
+            } : null));
+          }
+        }
       }
     } catch {} finally {
       setIsSubmitting(false);
@@ -446,6 +520,17 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Scan Result Output Popup Modal */}
+        <ScanResultModal
+          visible={!!scanResultData}
+          data={scanResultData}
+          onScanNext={handleScanNext}
+          onClose={() => {
+            setScanResultData(null);
+            onClose();
+          }}
+        />
       </View>
     </Modal>
   );

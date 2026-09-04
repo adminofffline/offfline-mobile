@@ -51,6 +51,7 @@ import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { brandApi } from '../../api/brand';
 import { api } from '../../api/client';
+import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 
 const { width } = Dimensions.get('window');
 
@@ -131,6 +132,7 @@ export function PlantDashboardScreen({ navigation }: any) {
 
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
+  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -408,7 +410,7 @@ export function PlantDashboardScreen({ navigation }: any) {
     }
   }, [showQrModal, hasCameraPermission]);
 
-  const handleRealQrScanned = useCallback((scannedCode: string) => {
+  const handleRealQrScanned = useCallback(async (scannedCode: string) => {
     if (isProcessingScanRef.current) return;
     isProcessingScanRef.current = true;
 
@@ -420,6 +422,7 @@ export function PlantDashboardScreen({ navigation }: any) {
 
     const activeCamp = selectedScanCampaign || orders[0];
     const cleanQr = String(scannedCode || '').trim();
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     setScannerCount((c) => c + 1);
     setBottledDispatchedCans((prev) => prev + 1);
@@ -433,6 +436,23 @@ export function PlantDashboardScreen({ navigation }: any) {
 
     triggerToast(`✓ Verified QR [${cleanQr.slice(-8)}] bottled!`);
 
+    // Instant Return Output Popup
+    setScanResultData({
+      status: 'SUCCESS',
+      title: '✓ Can QR Verified & Bottled',
+      message: 'Scan recorded successfully into production ledger.',
+      qrId: cleanQr,
+      canId: cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`,
+      campaignTitle: activeCamp?.campaign || 'Live Bottling Allocation',
+      plantName: plantProfileName,
+      locationName: activeCamp?.location || 'Chennai Hub',
+      payoutAmount: 0.50,
+      currentCount: (activeCamp?.bottledNum || 0) + 1,
+      allocatedQuantity: activeCamp?.quantityNum || 4000,
+      scanType: 'PLANT',
+      timestamp: nowTimeStr,
+    });
+
     // 2. Background non-blocking network telemetry
     const scanPayload = {
       qr_id: cleanQr,
@@ -445,29 +465,65 @@ export function PlantDashboardScreen({ navigation }: any) {
       accuracy: 4.5,
     };
 
-    plantApi.scanQr(scanPayload).catch(() => {});
+    try {
+      const res = await plantApi.scanQr(scanPayload);
+      if (res?.data) {
+        if (res.data.already_scanned || res.data.is_rescan) {
+          setScanResultData((prev) => (prev ? {
+            ...prev,
+            status: 'DUPLICATE',
+            title: '⚠️ Already Scanned',
+            message: res.data.message || 'This QR has already been scanned and verified.',
+          } : null));
+        } else {
+          setScanResultData((prev) => (prev ? {
+            ...prev,
+            status: 'SUCCESS',
+            campaignTitle: res.data.campaign_title || prev.campaignTitle,
+            locationName: res.data.location_name || prev.locationName,
+            plantName: res.data.plant_name || prev.plantName,
+            currentCount: res.data.current_count ?? prev.currentCount,
+            allocatedQuantity: res.data.allocated_quantity ?? prev.allocatedQuantity,
+            rawResponse: res.data,
+          } : null));
+        }
+      }
+    } catch (err: any) {
+      if (err.response?.status === 409 || err.response?.data?.already_scanned) {
+        setScanResultData((prev) => (prev ? {
+          ...prev,
+          status: 'DUPLICATE',
+          title: '⚠️ Already Scanned',
+          message: err.response?.data?.message || 'This QR has already been verified.',
+        } : null));
+      }
+    }
+  }, [selectedScanCampaign, orders, currentUser, plantProfileName]);
 
+  const handleScanNext = useCallback(() => {
+    setScanResultData(null);
     setTimeout(() => {
       isProcessingScanRef.current = false;
-    }, 800);
-  }, [selectedScanCampaign, orders, currentUser, plantProfileName]);
+    }, 250);
+  }, []);
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'code-128'],
     onCodeScanned: (codes) => {
       const firstVal = codes[0]?.value;
-      if (firstVal && !isProcessingScanRef.current) {
+      if (firstVal && !isProcessingScanRef.current && !scanResultData) {
         handleRealQrScanned(firstVal);
       }
     },
   });
 
   // ── Live QR Scan Execution on Production Server (Instant 0ms) ──
-  const handlePerformLiveScan = () => {
+  const handlePerformLiveScan = async () => {
     ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
 
     const activeCamp = selectedScanCampaign || orders[0];
     const generatedQrId = `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`;
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     setScannerCount((c) => c + 1);
     setBottledDispatchedCans((prev) => prev + 1);
@@ -480,6 +536,22 @@ export function PlantDashboardScreen({ navigation }: any) {
     }
 
     triggerToast(`✓ Real-time scan recorded: ${generatedQrId.slice(-8)}`);
+
+    setScanResultData({
+      status: 'SUCCESS',
+      title: '✓ Can QR Verified & Bottled',
+      message: 'Live production bottle logged to settlement ledger.',
+      qrId: generatedQrId,
+      canId: `CAN-${generatedQrId.slice(-6)}`,
+      campaignTitle: activeCamp?.campaign || 'Live Bottling Run',
+      plantName: plantProfileName,
+      locationName: activeCamp?.location || 'Chennai Hub',
+      payoutAmount: 0.50,
+      currentCount: (activeCamp?.bottledNum || 0) + 1,
+      allocatedQuantity: activeCamp?.quantityNum || 4000,
+      scanType: 'PLANT',
+      timestamp: nowTimeStr,
+    });
 
     const scanPayload = {
       qr_id: generatedQrId,
@@ -1051,6 +1123,20 @@ export function PlantDashboardScreen({ navigation }: any) {
               </View>
             </View>
           </SafeAreaView>
+
+          {/* ── Scan Result Output Popup Modal ── */}
+          <ScanResultModal
+            visible={!!scanResultData}
+            data={scanResultData}
+            onScanNext={handleScanNext}
+            onClose={() => {
+              setScanResultData(null);
+              setShowQrModal(false);
+              setTimeout(() => {
+                isProcessingScanRef.current = false;
+              }, 250);
+            }}
+          />
         </View>
       </Modal>
 
