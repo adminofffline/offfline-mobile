@@ -678,52 +678,18 @@ export function PlantDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadProductionData();
+            }}
+          />
+        }
       >
         {activeTab === 'work-orders' ? (
           <>
-            {/* ── LOCATION BAR ── */}
-            <View style={styles.locationBar}>
-              <TouchableOpacity
-                style={styles.locationLeft}
-                onPress={() => setShowLocationPicker(true)}
-                activeOpacity={0.7}
-              >
-                <MapPin color="#0891B2" size={15} />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {currentLocationDisplay}
-                </Text>
-              </TouchableOpacity>
-              
-              <View style={styles.locationRight}>
-                <TouchableOpacity
-                  style={styles.scanCansBtn}
-                  onPress={() => {
-                    if (filteredOrders.length > 0) {
-                      setSelectedScanCampaign(filteredOrders[0]);
-                    }
-                    setShowQrModal(true);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <QrCode color="#fff" size={14} />
-                  <Text style={styles.scanCansBtnText}>Scan Cans</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.viewAllBtn}
-                  onPress={() => {
-                    setCurrentLocationDisplay('All Chennai Plant Facilities');
-                    setActiveFilter('ALL');
-                    setSearchQuery('');
-                    triggerToast('✓ Showing all work orders & plant facilities');
-                  }}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                >
-                  <Text style={styles.viewAllText}>View All</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
             {/* ── 4 SUMMARY METRIC TILES (2x2 Grid) ── */}
             <View style={styles.metricGrid}>
               <View style={[styles.metricCard, styles.metricCardGray]}>
