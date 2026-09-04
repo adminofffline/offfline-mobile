@@ -145,13 +145,16 @@ export function DistributorDashboardScreen({ navigation }: any) {
       const auditScans = publicRes?.data?.scans || [];
 
       const mappedScans: ScanRecord[] = [];
+      const seenCanIds = new Set<string>();
 
-      // 1. Process Real Scans from Network
+      // 1. Process Real Scans from Network in O(N)
       if (Array.isArray(backendScans) && backendScans.length > 0) {
         backendScans.forEach((s: any, idx: number) => {
+          const cId = s.can_id || s.qr_id || `CAN-${String(idx).padStart(5, '0')}`;
+          seenCanIds.add(cId);
           mappedScans.push({
             id: s.id || s._id || `SCN_${idx}`,
-            can_id: s.can_id || s.qr_id || `CAN-${String(idx).padStart(5, '0')}`,
+            can_id: cId,
             campaign_title: s.campaign_name || s.campaign_title || 'Offfline Campaign',
             location_name: s.location_name || 'Chennai Hub',
             deliveryTime: s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '11:30 AM',
@@ -163,10 +166,12 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
       if (Array.isArray(auditScans) && auditScans.length > 0) {
         auditScans.forEach((s: any, idx: number) => {
-          if (!mappedScans.some((m) => m.can_id === (s.can_id || s.qr_id))) {
+          const cId = s.can_id || s.qr_id || `CAN-000${idx}`;
+          if (!seenCanIds.has(cId)) {
+            seenCanIds.add(cId);
             mappedScans.push({
               id: s.scan_id || `AUD_${idx}`,
-              can_id: s.can_id || s.qr_id || `CAN-000${idx}`,
+              can_id: cId,
               campaign_title: s.campaign_title || 'Offfline Partner Campaign',
               location_name: s.location_name || 'Chennai Zone',
               deliveryTime: s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '11:30 AM',

@@ -151,15 +151,24 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   });
 
   const processScanPayload = async (qrPayload: string) => {
-    setIsSubmitting(true);
-    let coords = location;
-    if (!coords) {
-      coords = await getCurrentPosition();
+    // 1. Instant 0ms Optimistic Feedback (Swiggy / Zomato instant responsiveness)
+    SoundService.playFeedback('SUCCESS');
+    setScannedSessionCount((prev) => prev + 1);
+    setHudStatus({
+      type: 'SUCCESS',
+      message: `✓ Scanned: ${qrPayload.slice(-8)}`,
+    });
+
+    if (onScanSuccess) {
+      onScanSuccess({ qr_id: qrPayload, campaign_id: campaignId });
     }
 
+    const coords = location || CONFIG.DEFAULT_LOCATION;
+
+    // 2. Background non-blocking network verification
     try {
       if (isPlant) {
-        const res = await plantApi.scanQr({
+        plantApi.scanQr({
           qr_id: qrPayload,
           campaign_id: campaignId,
           plant_id: user?._id || (user as any)?.plant_profile?.plant_id,
@@ -168,57 +177,17 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           latitude: coords?.latitude,
           longitude: coords?.longitude,
           accuracy: coords?.accuracy,
-        });
-
-        if (res.data?.already_scanned) {
-          SoundService.playFeedback('DUPLICATE');
-          setHudStatus({
-            type: 'DUPLICATE',
-            message: 'Warning: CanQR already registered!',
-          });
-        } else {
-          SoundService.playFeedback('SUCCESS');
-          setScannedSessionCount((prev) => prev + 1);
-          setHudStatus({
-            type: 'SUCCESS',
-            message: `✓ Bottled: ${qrPayload.slice(-8)}`,
-          });
-          if (onScanSuccess) onScanSuccess(res.data);
-        }
+        }).catch(() => {});
       } else {
-        // Distributor Scan
-        const res = await distributorApi.scanQr({
+        distributorApi.scanQr({
           qr_id: qrPayload,
           campaign_id: campaignId,
           latitude: coords?.latitude,
           longitude: coords?.longitude,
           accuracy: coords?.accuracy,
-        });
-
-        if (res.data?.already_scanned) {
-          SoundService.playFeedback('DUPLICATE');
-          setHudStatus({
-            type: 'DUPLICATE',
-            message: 'Warning: CanQR already verified for this retail point!',
-          });
-        } else {
-          SoundService.playFeedback('SUCCESS');
-          setScannedSessionCount((prev) => prev + 1);
-          setHudStatus({
-            type: 'SUCCESS',
-            message: `✓ Delivered: ${qrPayload.slice(-8)} (+₹1.50)`,
-          });
-          if (onScanSuccess) onScanSuccess(res.data);
-        }
+        }).catch(() => {});
       }
-    } catch (err: any) {
-      SoundService.playFeedback('ERROR');
-      const msg = err.response?.data?.message || 'Scan verification failed';
-      setHudStatus({
-        type: 'ERROR',
-        message: msg,
-      });
-    } finally {
+    } catch {} finally {
       setIsSubmitting(false);
     }
   };

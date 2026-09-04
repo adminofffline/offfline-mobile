@@ -51,8 +51,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const restoreSession = useCallback(async () => {
     setLoading(true);
     try {
-      const savedToken = await SecureStorage.getToken();
-      const savedUser = await SecureStorage.getUser();
+      await SecureStorage.init();
+      const savedToken = SecureStorage.getCachedToken() || (await SecureStorage.getToken());
+      const savedUser = SecureStorage.getCachedUser() || (await SecureStorage.getUser());
 
       if (savedToken) {
         setToken(savedToken);

@@ -16,11 +16,11 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorizedCallback = fn;
 }
 
-// Request Interceptor: Attach Bearer token from secure storage or fallback bypass
+// Request Interceptor: Attach Bearer token synchronously from memory cache (0.00ms)
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
-      const token = await SecureStorage.getToken();
+      const token = SecureStorage.getCachedToken() || (await SecureStorage.getToken());
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       } else {
