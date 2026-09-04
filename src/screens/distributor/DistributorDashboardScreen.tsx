@@ -669,6 +669,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           key: 'scan-reports',
           label: 'Scan Report',
           icon: FileText,
+          badge: scans.length > 0 ? scans.length : undefined,
         }}
         rightTab={{
           key: 'settlement-report',

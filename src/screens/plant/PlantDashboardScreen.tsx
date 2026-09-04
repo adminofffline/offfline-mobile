@@ -914,6 +914,7 @@ export function PlantDashboardScreen({ navigation }: any) {
           key: 'work-orders',
           label: 'Work Orders',
           icon: FileText,
+          badge: activeJobsCount > 0 ? activeJobsCount : undefined,
         }}
         rightTab={{
           key: 'settlement-report',

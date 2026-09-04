@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ export interface NavTabItem {
   key: string;
   label: string;
   icon: LucideIcon | React.ComponentType<any>;
+  badge?: number | string;
 }
 
 export interface LiquidGlassNavBarProps {
@@ -38,11 +39,23 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
   const leftTabScale = useRef(new Animated.Value(1)).current;
   const rightTabScale = useRef(new Animated.Value(1)).current;
 
+  // Sliding indicator animation (0 = Left, 1 = Right)
+  const slideAnim = useRef(new Animated.Value(activeTab === leftTab.key ? 0 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: activeTab === leftTab.key ? 0 : 1,
+      friction: 7,
+      tension: 65,
+      useNativeDriver: false,
+    }).start();
+  }, [activeTab, leftTab.key, slideAnim]);
+
   const handleOrbPressIn = () => {
     Animated.spring(orbScale, {
-      toValue: 0.9,
-      friction: 6,
-      tension: 120,
+      toValue: 0.88,
+      friction: 5,
+      tension: 140,
       useNativeDriver: true,
     }).start();
   };
@@ -50,8 +63,8 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
   const handleOrbPressOut = () => {
     Animated.spring(orbScale, {
       toValue: 1,
-      friction: 5,
-      tension: 80,
+      friction: 4,
+      tension: 90,
       useNativeDriver: true,
     }).start();
   };
@@ -76,14 +89,14 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
 
     Animated.sequence([
       Animated.timing(scaleAnim, {
-        toValue: 0.94,
-        duration: 80,
+        toValue: 0.92,
+        duration: 70,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 4,
-        tension: 90,
+        tension: 100,
         useNativeDriver: true,
       }),
     ]).start();
@@ -98,26 +111,33 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
   const RightIcon = rightTab.icon;
 
   return (
-    <View style={styles.navBarWrapper} pointerEvents="box-none">
-      {/* Translucent Glass Base Bar */}
-      <View style={styles.navBarContainer}>
-        {/* ── Left Tab ── */}
+    <View style={styles.floatingWrapper} pointerEvents="box-none">
+      {/* ── Floating Liquid Glass Dynamic Capsule Bar ── */}
+      <View style={styles.glassCapsuleBar}>
+        {/* Left Tab Button */}
         <Animated.View style={[{ transform: [{ scale: leftTabScale }] }]}>
           <TouchableOpacity
-            style={[styles.tabButton, isLeftActive && styles.activePill]}
+            style={[styles.tabButton, isLeftActive && styles.activePillBackground]}
             onPress={() => handleTabPress(leftTab.key, leftTabScale)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.82}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <LeftIcon
-              color={isLeftActive ? '#0F172A' : '#64748B'}
-              size={21}
-              strokeWidth={isLeftActive ? 2.4 : 1.9}
-            />
+            <View style={styles.iconBadgeWrap}>
+              <LeftIcon
+                color={isLeftActive ? '#0F172A' : '#64748B'}
+                size={21}
+                strokeWidth={isLeftActive ? 2.4 : 1.9}
+              />
+              {leftTab.badge !== undefined && (
+                <View style={styles.redBadgePill}>
+                  <Text style={styles.redBadgeText}>{leftTab.badge}</Text>
+                </View>
+              )}
+            </View>
             <Text
               style={[
-                styles.tabLabel,
-                isLeftActive ? styles.activeTabLabel : styles.inactiveTabLabel,
+                styles.tabLabelText,
+                isLeftActive ? styles.activeLabel : styles.inactiveLabel,
               ]}
               numberOfLines={1}
             >
@@ -126,26 +146,33 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ── Center Placeholder to reserve space for Orb ── */}
-        <View style={styles.centerSpacePlaceholder} />
+        {/* Center Reservation Gap for Floating Orb */}
+        <View style={styles.orbReservedGap} />
 
-        {/* ── Right Tab ── */}
+        {/* Right Tab Button */}
         <Animated.View style={[{ transform: [{ scale: rightTabScale }] }]}>
           <TouchableOpacity
-            style={[styles.tabButton, isRightActive && styles.activePill]}
+            style={[styles.tabButton, isRightActive && styles.activePillBackground]}
             onPress={() => handleTabPress(rightTab.key, rightTabScale)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.82}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <RightIcon
-              color={isRightActive ? '#0F172A' : '#64748B'}
-              size={21}
-              strokeWidth={isRightActive ? 2.4 : 1.9}
-            />
+            <View style={styles.iconBadgeWrap}>
+              <RightIcon
+                color={isRightActive ? '#0F172A' : '#64748B'}
+                size={21}
+                strokeWidth={isRightActive ? 2.4 : 1.9}
+              />
+              {rightTab.badge !== undefined && (
+                <View style={styles.redBadgePill}>
+                  <Text style={styles.redBadgeText}>{rightTab.badge}</Text>
+                </View>
+              )}
+            </View>
             <Text
               style={[
-                styles.tabLabel,
-                isRightActive ? styles.activeTabLabel : styles.inactiveTabLabel,
+                styles.tabLabelText,
+                isRightActive ? styles.activeLabel : styles.inactiveLabel,
               ]}
               numberOfLines={1}
             >
@@ -155,29 +182,31 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
         </Animated.View>
       </View>
 
-      {/* ── Center Floating Liquid Glass Orb ── */}
-      <View style={styles.floatingCenterWrap} pointerEvents="box-none">
+      {/* ── Center Elevated Floating Liquid Glass Scan Orb ── */}
+      <View style={styles.orbAnchorWrap} pointerEvents="box-none">
         <Animated.View
           style={[
-            styles.floatingOrbContainer,
+            styles.orbSpringContainer,
             { transform: [{ scale: orbScale }] },
           ]}
         >
-          {/* Outer Halo Glow Layer */}
-          <View style={styles.orbHaloGlow} />
+          {/* Ambient Radial Halo Glow */}
+          <View style={styles.orbAmbientHalo} />
 
-          {/* Liquid Glass Circular Button */}
+          {/* Liquid Frosted Glass Orb Surface */}
           <TouchableOpacity
-            style={styles.floatingGlassOrb}
+            style={styles.orbGlassSurface}
             onPressIn={handleOrbPressIn}
             onPressOut={handleOrbPressOut}
             onPress={handleOrbPress}
             activeOpacity={0.92}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           >
-            {/* Inner Glass Highlight Gradient effect */}
-            <View style={styles.innerGlassHighlight} />
-            <Scan color="#475569" size={28} strokeWidth={2.4} />
+            {/* Specular Top Glass Reflection */}
+            <View style={styles.orbSpecularShine} />
+            
+            {/* 4-Corner Viewfinder Reticle Icon */}
+            <Scan color="#334155" size={28} strokeWidth={2.4} />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -186,7 +215,7 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
 };
 
 const styles = StyleSheet.create({
-  navBarWrapper: {
+  floatingWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -194,89 +223,113 @@ const styles = StyleSheet.create({
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'flex-end',
+    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
   },
-  navBarContainer: {
-    width: '100%',
-    height: Platform.OS === 'ios' ? 82 : 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(241, 245, 249, 0.9)',
+  glassCapsuleBar: {
+    width: Math.min(width - 32, 400),
+    height: 66,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 33,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'ios' ? 18 : 6,
-    paddingTop: 6,
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 14,
   },
   tabButton: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderRadius: 22,
-    minWidth: 110,
-  },
-  activePill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    paddingHorizontal: 20,
+    paddingVertical: 7,
     borderRadius: 24,
+    minWidth: 116,
+    height: 52,
+  },
+  activePillBackground: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 1)',
     shadowColor: '#94A3B8',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 4,
   },
-  tabLabel: {
+  iconBadgeWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redBadgePill: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: '#EF4444',
+    borderRadius: 999,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  redBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  tabLabelText: {
     fontSize: 11.5,
     marginTop: 3,
-    letterSpacing: -0.1,
+    letterSpacing: -0.15,
   },
-  activeTabLabel: {
+  activeLabel: {
     color: '#0F172A',
     fontWeight: '700',
   },
-  inactiveTabLabel: {
+  inactiveLabel: {
     color: '#64748B',
     fontWeight: '600',
   },
-  centerSpacePlaceholder: {
-    width: 68,
+  orbReservedGap: {
+    width: 60,
     height: 40,
   },
-  floatingCenterWrap: {
+  orbAnchorWrap: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? -28 : -30,
+    top: -20,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 105,
+    zIndex: 110,
   },
-  floatingOrbContainer: {
+  orbSpringContainer: {
     width: 72,
     height: 72,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  orbHaloGlow: {
+  orbAmbientHalo: {
     position: 'absolute',
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: 'rgba(226, 232, 240, 0.5)',
-    shadowColor: '#94A3B8',
+    backgroundColor: 'rgba(226, 232, 240, 0.6)',
+    shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.32,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 10,
   },
-  floatingGlassOrb: {
+  orbGlassSurface: {
     width: 68,
     height: 68,
     borderRadius: 34,
@@ -285,21 +338,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 1)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#475569',
+    shadowColor: '#334155',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.22,
     shadowRadius: 14,
     elevation: 10,
     position: 'relative',
     overflow: 'hidden',
   },
-  innerGlassHighlight: {
+  orbSpecularShine: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderTopLeftRadius: 34,
     borderTopRightRadius: 34,
   },
