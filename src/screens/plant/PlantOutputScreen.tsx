@@ -126,6 +126,7 @@ export const PlantOutputScreen: React.FC = () => {
       <FlatList
         data={entries}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
         contentContainerStyle={styles.scrollContent}
         ListHeaderComponent={
           <View style={styles.headerSection}>

@@ -97,6 +97,7 @@ export const PlantBatchesScreen: React.FC = () => {
       <FlatList
         data={batches}
         keyExtractor={(item, index) => item._id || item.id || `batch_${index}`}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
         contentContainerStyle={styles.scrollContent}
         ListHeaderComponent={
           <View style={styles.headerSection}>

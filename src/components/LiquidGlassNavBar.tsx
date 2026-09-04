@@ -7,11 +7,17 @@ import {
   Animated,
   Platform,
   Dimensions,
+  Easing,
 } from 'react-native';
 import { Scan, LucideIcon } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 const { width } = Dimensions.get('window');
+const BAR_WIDTH = Math.min(width - 48, 330);
+const TAB_PADDING = 4;
+const ORB_GAP_WIDTH = 50;
+const TAB_WIDTH = (BAR_WIDTH - ORB_GAP_WIDTH - TAB_PADDING * 2) / 2;
+const TRAVEL_DISTANCE = TAB_WIDTH + ORB_GAP_WIDTH;
 
 export interface NavTabItem {
   key: string;
@@ -35,36 +41,64 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
   onSelectTab,
   onPressCenterScan,
 }) => {
-  const orbScale = useRef(new Animated.Value(1)).current;
-  const leftTabScale = useRef(new Animated.Value(1)).current;
-  const rightTabScale = useRef(new Animated.Value(1)).current;
+  // ── Composite Liquid Glass Slider (0 = Left Tab, 1 = Right Tab) ──
+  const isLeft = activeTab === leftTab.key;
+  const slideAnim = useRef(new Animated.Value(isLeft ? 0 : 1)).current;
 
-  // Sliding indicator animation (0 = Left, 1 = Right)
-  const slideAnim = useRef(new Animated.Value(activeTab === leftTab.key ? 0 : 1)).current;
+  // ── Minute Liquid Ripple Animations ──
+  const leftRipple = useRef(new Animated.Value(0)).current;
+  const rightRipple = useRef(new Animated.Value(0)).current;
+  const orbRipple = useRef(new Animated.Value(0)).current;
+
+  // ── Orb Press State (Smooth Linear Transition, No Bounce) ──
+  const orbScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: activeTab === leftTab.key ? 0 : 1,
-      friction: 7,
-      tension: 65,
-      useNativeDriver: false,
+    // Smooth composite liquid slider glide (Linear + Cubic Easing, Zero Bouncing)
+    Animated.timing(slideAnim, {
+      toValue: isLeft ? 0 : 1,
+      duration: 260,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
     }).start();
-  }, [activeTab, leftTab.key, slideAnim]);
+  }, [isLeft, slideAnim]);
+
+  const triggerMinuteRipple = (rippleAnim: Animated.Value) => {
+    rippleAnim.setValue(0);
+    Animated.timing(rippleAnim, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleTabPress = (tabKey: string, isLeftTarget: boolean) => {
+    try {
+      ReactNativeHapticFeedback.trigger('selection', {
+        enableVibrateFallback: true,
+        ignoreAndroidSystemSettings: false,
+      });
+    } catch (e) {}
+
+    triggerMinuteRipple(isLeftTarget ? leftRipple : rightRipple);
+    onSelectTab(tabKey);
+  };
 
   const handleOrbPressIn = () => {
-    Animated.spring(orbScale, {
-      toValue: 0.88,
-      friction: 5,
-      tension: 140,
+    Animated.timing(orbScale, {
+      toValue: 0.94,
+      duration: 80,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   };
 
   const handleOrbPressOut = () => {
-    Animated.spring(orbScale, {
+    Animated.timing(orbScale, {
       toValue: 1,
-      friction: 4,
-      tension: 90,
+      duration: 120,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   };
@@ -76,122 +110,193 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
         ignoreAndroidSystemSettings: false,
       });
     } catch (e) {}
+
+    triggerMinuteRipple(orbRipple);
     onPressCenterScan();
   };
-
-  const handleTabPress = (tabKey: string, scaleAnim: Animated.Value) => {
-    try {
-      ReactNativeHapticFeedback.trigger('selection', {
-        enableVibrateFallback: true,
-        ignoreAndroidSystemSettings: false,
-      });
-    } catch (e) {}
-
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.92,
-        duration: 70,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    onSelectTab(tabKey);
-  };
-
-  const isLeftActive = activeTab === leftTab.key;
-  const isRightActive = activeTab === rightTab.key;
 
   const LeftIcon = leftTab.icon;
   const RightIcon = rightTab.icon;
 
+  // ── Composite Interpolations for Liquid Slider ──
+  const sliderTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, TRAVEL_DISTANCE],
+  });
+
+  // Subtle liquid hydrodynamic stretch while traveling
+  const sliderScaleX = slideAnim.interpolate({
+    inputRange: [0, 0.45, 0.75, 1],
+    outputRange: [1, 1.04, 1.04, 1],
+  });
+
+  const sliderScaleY = slideAnim.interpolate({
+    inputRange: [0, 0.45, 0.75, 1],
+    outputRange: [1, 0.97, 0.97, 1],
+  });
+
   return (
     <View style={styles.floatingWrapper} pointerEvents="box-none">
-      {/* ── Floating Liquid Glass Dynamic Capsule Bar ── */}
+      {/* ── Main Dynamic Island Liquid Glass Capsule Bar ── */}
       <View style={styles.glassCapsuleBar}>
-        {/* Left Tab Button */}
-        <Animated.View style={[{ transform: [{ scale: leftTabScale }] }]}>
-          <TouchableOpacity
-            style={[styles.tabButton, isLeftActive && styles.activePillBackground]}
-            onPress={() => handleTabPress(leftTab.key, leftTabScale)}
-            activeOpacity={0.82}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <View style={styles.iconBadgeWrap}>
-              <LeftIcon
-                color={isLeftActive ? '#0F172A' : '#64748B'}
-                size={21}
-                strokeWidth={isLeftActive ? 2.4 : 1.9}
-              />
-              {leftTab.badge !== undefined && (
-                <View style={styles.redBadgePill}>
-                  <Text style={styles.redBadgeText}>{leftTab.badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabelText,
-                isLeftActive ? styles.activeLabel : styles.inactiveLabel,
-              ]}
-              numberOfLines={1}
-            >
-              {leftTab.label}
-            </Text>
-          </TouchableOpacity>
+        {/* ── Physical Sliding Liquid Glass Capsule Pill ── */}
+        <Animated.View
+          style={[
+            styles.slidingLiquidPill,
+            {
+              transform: [
+                { translateX: sliderTranslateX },
+                { scaleX: sliderScaleX },
+                { scaleY: sliderScaleY },
+              ],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          {/* Specular Liquid Glass Top Highlight */}
+          <View style={styles.pillSpecularShine} />
         </Animated.View>
 
-        {/* Center Reservation Gap for Floating Orb */}
+        {/* ── Left Tab Target Area ── */}
+        <TouchableOpacity
+          style={styles.tabTarget}
+          onPress={() => handleTabPress(leftTab.key, true)}
+          activeOpacity={0.88}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          {/* Minute Liquid Glass Ripple */}
+          <Animated.View
+            style={[
+              styles.liquidRippleRing,
+              {
+                opacity: leftRipple.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.45, 0],
+                }),
+                transform: [
+                  {
+                    scale: leftRipple.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.85, 1.3],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          />
+
+          <View style={styles.iconBadgeWrap}>
+            <LeftIcon
+              color={isLeft ? '#0F172A' : '#64748B'}
+              size={19}
+              strokeWidth={isLeft ? 2.4 : 1.9}
+            />
+            {leftTab.badge !== undefined && (
+              <View style={styles.redBadgePill}>
+                <Text style={styles.redBadgeText}>{leftTab.badge}</Text>
+              </View>
+            )}
+          </View>
+          <Text
+            style={[
+              styles.tabLabelText,
+              isLeft ? styles.activeLabel : styles.inactiveLabel,
+            ]}
+            numberOfLines={1}
+          >
+            {leftTab.label}
+          </Text>
+        </TouchableOpacity>
+
+        {/* ── Center Reservation Gap for Floating Orb ── */}
         <View style={styles.orbReservedGap} />
 
-        {/* Right Tab Button */}
-        <Animated.View style={[{ transform: [{ scale: rightTabScale }] }]}>
-          <TouchableOpacity
-            style={[styles.tabButton, isRightActive && styles.activePillBackground]}
-            onPress={() => handleTabPress(rightTab.key, rightTabScale)}
-            activeOpacity={0.82}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        {/* ── Right Tab Target Area ── */}
+        <TouchableOpacity
+          style={styles.tabTarget}
+          onPress={() => handleTabPress(rightTab.key, false)}
+          activeOpacity={0.88}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          {/* Minute Liquid Glass Ripple */}
+          <Animated.View
+            style={[
+              styles.liquidRippleRing,
+              {
+                opacity: rightRipple.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.45, 0],
+                }),
+                transform: [
+                  {
+                    scale: rightRipple.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.85, 1.3],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          />
+
+          <View style={styles.iconBadgeWrap}>
+            <RightIcon
+              color={!isLeft ? '#0F172A' : '#64748B'}
+              size={19}
+              strokeWidth={!isLeft ? 2.4 : 1.9}
+            />
+            {rightTab.badge !== undefined && (
+              <View style={styles.redBadgePill}>
+                <Text style={styles.redBadgeText}>{rightTab.badge}</Text>
+              </View>
+            )}
+          </View>
+          <Text
+            style={[
+              styles.tabLabelText,
+              !isLeft ? styles.activeLabel : styles.inactiveLabel,
+            ]}
+            numberOfLines={1}
           >
-            <View style={styles.iconBadgeWrap}>
-              <RightIcon
-                color={isRightActive ? '#0F172A' : '#64748B'}
-                size={21}
-                strokeWidth={isRightActive ? 2.4 : 1.9}
-              />
-              {rightTab.badge !== undefined && (
-                <View style={styles.redBadgePill}>
-                  <Text style={styles.redBadgeText}>{rightTab.badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabelText,
-                isRightActive ? styles.activeLabel : styles.inactiveLabel,
-              ]}
-              numberOfLines={1}
-            >
-              {rightTab.label}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
+            {rightTab.label}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* ── Center Elevated Floating Liquid Glass Scan Orb ── */}
       <View style={styles.orbAnchorWrap} pointerEvents="box-none">
         <Animated.View
           style={[
-            styles.orbSpringContainer,
+            styles.orbContainer,
             { transform: [{ scale: orbScale }] },
           ]}
         >
-          {/* Ambient Radial Halo Glow */}
+          {/* Ambient Halo Diffused Glass Glow */}
           <View style={styles.orbAmbientHalo} />
+
+          {/* Minute Liquid Ripple on Orb */}
+          <Animated.View
+            style={[
+              styles.orbLiquidRipple,
+              {
+                opacity: orbRipple.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 0],
+                }),
+                transform: [
+                  {
+                    scale: orbRipple.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1.35],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          />
 
           {/* Liquid Frosted Glass Orb Surface */}
           <TouchableOpacity
@@ -202,11 +307,11 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
             activeOpacity={0.92}
             hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           >
-            {/* Specular Top Glass Reflection */}
+            {/* Top Glass Specular Shine */}
             <View style={styles.orbSpecularShine} />
             
             {/* 4-Corner Viewfinder Reticle Icon */}
-            <Scan color="#334155" size={28} strokeWidth={2.4} />
+            <Scan color="#334155" size={24} strokeWidth={2.4} />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -223,44 +328,69 @@ const styles = StyleSheet.create({
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 10,
   },
   glassCapsuleBar: {
-    width: Math.min(width - 32, 400),
-    height: 66,
+    width: BAR_WIDTH,
+    height: 56,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    borderRadius: 33,
-    borderWidth: 1.5,
+    borderRadius: 28,
+    borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.95)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
+    paddingHorizontal: TAB_PADDING,
+    position: 'relative',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  tabButton: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 7,
-    borderRadius: 24,
-    minWidth: 116,
-    height: 52,
-  },
-  activePillBackground: {
+  slidingLiquidPill: {
+    position: 'absolute',
+    top: TAB_PADDING,
+    left: TAB_PADDING,
+    width: TAB_WIDTH,
+    height: 48,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderWidth: 1.5,
+    borderRadius: 24,
+    borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 1)',
     shadowColor: '#94A3B8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
+    overflow: 'hidden',
+  },
+  pillSpecularShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  tabTarget: {
+    width: TAB_WIDTH,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+    position: 'relative',
+  },
+  liquidRippleRing: {
+    position: 'absolute',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(226, 232, 240, 0.6)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   iconBadgeWrap: {
     position: 'relative',
@@ -269,26 +399,26 @@ const styles = StyleSheet.create({
   },
   redBadgePill: {
     position: 'absolute',
-    top: -4,
-    right: -10,
+    top: -3,
+    right: -8,
     backgroundColor: '#EF4444',
     borderRadius: 999,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 4,
+    minWidth: 15,
+    height: 15,
+    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderColor: '#FFFFFF',
   },
   redBadgeText: {
     color: '#FFFFFF',
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '800',
   },
   tabLabelText: {
-    fontSize: 11.5,
-    marginTop: 3,
+    fontSize: 10.5,
+    marginTop: 2,
     letterSpacing: -0.15,
   },
   activeLabel: {
@@ -300,49 +430,58 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   orbReservedGap: {
-    width: 60,
-    height: 40,
+    width: ORB_GAP_WIDTH,
+    height: 36,
   },
   orbAnchorWrap: {
     position: 'absolute',
-    top: -20,
+    top: -16,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 110,
   },
-  orbSpringContainer: {
-    width: 72,
-    height: 72,
+  orbContainer: {
+    width: 62,
+    height: 62,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   orbAmbientHalo: {
     position: 'absolute',
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(226, 232, 240, 0.6)',
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.32,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  orbLiquidRipple: {
+    position: 'absolute',
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: 'rgba(226, 232, 240, 0.7)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   orbGlassSurface: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 1)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#334155',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -351,10 +490,10 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 32,
+    height: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
   },
 });
 

@@ -108,6 +108,9 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={loadNotifications} />
+          }
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <TouchableOpacity
