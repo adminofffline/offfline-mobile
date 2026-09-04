@@ -504,15 +504,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadProductionData();
-            }}
-          />
-        }
       >
         {activeTab === 'scan-reports' ? (
           <>

@@ -678,15 +678,6 @@ export function PlantDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadProductionData();
-            }}
-          />
-        }
       >
         {activeTab === 'work-orders' ? (
           <>
