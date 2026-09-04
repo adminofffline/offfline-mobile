@@ -13,9 +13,9 @@ import { Scan, LucideIcon } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 const { width } = Dimensions.get('window');
-const BAR_WIDTH = Math.min(width - 48, 330);
-const TAB_PADDING = 4;
-const ORB_GAP_WIDTH = 50;
+const BAR_WIDTH = Math.min(width - 32, 400);
+const TAB_PADDING = 6;
+const ORB_GAP_WIDTH = 64;
 const TAB_WIDTH = (BAR_WIDTH - ORB_GAP_WIDTH - TAB_PADDING * 2) / 2;
 const TRAVEL_DISTANCE = TAB_WIDTH + ORB_GAP_WIDTH;
 
@@ -189,7 +189,7 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
           <View style={styles.iconBadgeWrap}>
             <LeftIcon
               color={isLeft ? '#0F172A' : '#64748B'}
-              size={19}
+              size={21}
               strokeWidth={isLeft ? 2.4 : 1.9}
             />
             {leftTab.badge !== undefined && (
@@ -244,7 +244,7 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
           <View style={styles.iconBadgeWrap}>
             <RightIcon
               color={!isLeft ? '#0F172A' : '#64748B'}
-              size={19}
+              size={21}
               strokeWidth={!isLeft ? 2.4 : 1.9}
             />
             {rightTab.badge !== undefined && (
@@ -311,7 +311,7 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
             <View style={styles.orbSpecularShine} />
             
             {/* 4-Corner Viewfinder Reticle Icon */}
-            <Scan color="#334155" size={24} strokeWidth={2.4} />
+            <Scan color="#334155" size={28} strokeWidth={2.4} />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -328,14 +328,14 @@ const styles = StyleSheet.create({
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingBottom: Platform.OS === 'ios' ? 18 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
   },
   glassCapsuleBar: {
     width: BAR_WIDTH,
-    height: 56,
+    height: 66,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    borderRadius: 28,
-    borderWidth: 1.2,
+    borderRadius: 33,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.95)',
     flexDirection: 'row',
     alignItems: 'center',
@@ -343,25 +343,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: TAB_PADDING,
     position: 'relative',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 14,
   },
   slidingLiquidPill: {
     position: 'absolute',
     top: TAB_PADDING,
     left: TAB_PADDING,
     width: TAB_WIDTH,
-    height: 48,
+    height: 52,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 24,
-    borderWidth: 1.2,
+    borderRadius: 26,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 1)',
     shadowColor: '#94A3B8',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
     elevation: 4,
     overflow: 'hidden',
   },
@@ -370,14 +370,14 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 20,
+    height: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
   },
   tabTarget: {
     width: TAB_WIDTH,
-    height: 48,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
@@ -385,11 +385,11 @@ const styles = StyleSheet.create({
   },
   liquidRippleRing: {
     position: 'absolute',
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: 'rgba(226, 232, 240, 0.6)',
-    borderWidth: 1.2,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   iconBadgeWrap: {
@@ -399,26 +399,26 @@ const styles = StyleSheet.create({
   },
   redBadgePill: {
     position: 'absolute',
-    top: -3,
-    right: -8,
+    top: -4,
+    right: -10,
     backgroundColor: '#EF4444',
     borderRadius: 999,
-    minWidth: 15,
-    height: 15,
-    paddingHorizontal: 3,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.2,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
   redBadgeText: {
     color: '#FFFFFF',
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontWeight: '800',
   },
   tabLabelText: {
-    fontSize: 10.5,
-    marginTop: 2,
+    fontSize: 11.5,
+    marginTop: 3,
     letterSpacing: -0.15,
   },
   activeLabel: {
@@ -431,57 +431,57 @@ const styles = StyleSheet.create({
   },
   orbReservedGap: {
     width: ORB_GAP_WIDTH,
-    height: 36,
+    height: 40,
   },
   orbAnchorWrap: {
     position: 'absolute',
-    top: -16,
+    top: -20,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 110,
   },
   orbContainer: {
-    width: 62,
-    height: 62,
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   orbAmbientHalo: {
     position: 'absolute',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: 'rgba(226, 232, 240, 0.6)',
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    elevation: 10,
   },
   orbLiquidRipple: {
     position: 'absolute',
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
     backgroundColor: 'rgba(226, 232, 240, 0.7)',
-    borderWidth: 1.2,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   orbGlassSurface: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 1)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#334155',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 10,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -490,10 +490,10 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 24,
+    height: 32,
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
   },
 });
 

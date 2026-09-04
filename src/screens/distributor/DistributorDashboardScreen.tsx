@@ -51,8 +51,65 @@ import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
+const CIRCLE_SIZE = Math.min(64, Math.floor((width - 48) / 4));
+
+// ── Custom SVG Icons for Circular Metric Badges (Pixel-matched to design) ──
+const DocSheetIcon = ({ size = 25, color = '#0284C7' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M5 4C5 2.89543 5.89543 2 7 2H14.5L19 6.5V20C19 21.1046 18.1046 22 17 22H7C5.89543 22 5 21.1046 5 20V4Z"
+      fill={color}
+    />
+    <Path d="M14 2V6C14 6.55228 14.4477 7 15 7H19" fill={color} fillOpacity={0.65} />
+    <Rect x="8" y="10" width="8" height="2" rx="1" fill="#FFFFFF" />
+    <Rect x="8" y="13.5" width="8" height="2" rx="1" fill="#FFFFFF" />
+    <Rect x="8" y="17" width="5" height="2" rx="1" fill="#FFFFFF" />
+  </Svg>
+);
+
+const BottleBadgeIcon = ({ size = 26, color = '#059669' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="9.5" y="2" width="5" height="2" rx="0.75" fill={color} />
+    <Path
+      d="M10 4V7L8 10V20C8 21.1 8.9 22 10 22H14C15.1 22 16 21.1 16 20V10L14 7V4H10Z"
+      fill={color}
+    />
+    <Rect x="9.5" y="12" width="5" height="4.5" rx="1" fill="#FFFFFF" fillOpacity={0.95} />
+  </Svg>
+);
+
+const TruckBadgeIcon = ({ size = 26, color = '#F97316' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M2 5C2 4.44772 2.44772 4 3 4H14C14.5523 4 15 4.44772 15 5V14H2V5Z"
+      fill={color}
+    />
+    <Path
+      d="M15 7.5H18.5C18.8978 7.5 19.2794 7.65804 19.5607 7.93934L22.0607 10.4393C22.342 10.7206 22.5 11.1022 22.5 11.5V15C22.5 15.5523 22.0523 16 21.5 16H20.4C20.08 14.85 19.04 14 17.8 14C16.56 14 15.52 14.85 15.2 16H8.8C8.48 14.85 7.44 14 6.2 14C4.96 14 3.92 14.85 3.6 16H2.5C1.94772 16 1.5 15.5523 1.5 15V13H15V7.5Z"
+      fill={color}
+    />
+    <Circle cx="6.2" cy="16.5" r="2.3" fill={color} />
+    <Circle cx="17.8" cy="16.5" r="2.3" fill={color} />
+    <Circle cx="6.2" cy="16.5" r="0.9" fill="#FFFFFF" />
+    <Circle cx="17.8" cy="16.5" r="0.9" fill="#FFFFFF" />
+    <Path d="M16 9H18L20 11.5H16V9Z" fill="#FFFFFF" fillOpacity={0.9} />
+  </Svg>
+);
+
+const RupeeBadgeIcon = ({ size = 24, color = '#7C3AED' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M6 4.5H18M6 8.5H18M6 4.5V12.5C6 14.2 7.3 15.5 9.5 15.5H12L17.5 21.5M10 12.5H14C15.6569 12.5 17 11.1569 17 9.5C17 7.84315 15.6569 6.5 14 6.5H6"
+      stroke={color}
+      strokeWidth="2.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
 
 interface ScanRecord {
   id: string;
@@ -82,6 +139,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -461,17 +519,24 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // Filtered Records
   const filteredRecords = useMemo(() => {
-    if (!searchQuery.trim()) return scans;
-    const q = searchQuery.toLowerCase().trim();
-    return scans.filter(
-      (s) =>
+    return scans.filter((s) => {
+      if (activeFilter === 'COMPLETED' && s.status !== 'VERIFIED') return false;
+      if (activeFilter === 'PENDING' && s.status === 'VERIFIED') return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
         s.can_id.toLowerCase().includes(q) ||
         s.campaign_title.toLowerCase().includes(q) ||
         s.location_name.toLowerCase().includes(q)
-    );
-  }, [scans, searchQuery]);
+      );
+    });
+  }, [scans, searchQuery, activeFilter]);
 
   const todayLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const uniqueCampaignsCount = useMemo(() => {
+    return Math.max(1, new Set(scans.map((s) => s.campaign_title)).size);
+  }, [scans]);
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -517,45 +582,93 @@ export function DistributorDashboardScreen({ navigation }: any) {
       >
         {activeTab === 'scan-reports' ? (
           <>
-            {/* Header Title Bar */}
-            <View style={styles.titleRow}>
-              <Text style={styles.pageTitle}>Today's Scan Report</Text>
-            </View>
-
-            {/* 2 Metric Summary Tiles */}
-            <View style={styles.metricGrid}>
-              <View style={[styles.metricCard, styles.metricCardGray]}>
-                <Text style={styles.metricLabelGray}>Verified Scans</Text>
-                <View style={styles.metricValueRow}>
-                  <Text style={styles.metricValueDark}>{scans.length}</Text>
-                  <Text style={styles.metricUnitDark}> Cans</Text>
+            {/* ── 4 CIRCULAR STAT BADGES (Pixel-Matched to Design Attachment) ── */}
+            <View style={styles.metricsRowWrapper}>
+              {/* 1. Active Batches */}
+              <View style={styles.metricCircleCol}>
+                <View style={[styles.circleBadge, styles.circleBadgeBlue]}>
+                  <DocSheetIcon size={24} color="#0284C7" />
                 </View>
+                <Text style={styles.metricStatValue}>{uniqueCampaignsCount}</Text>
+                <Text style={styles.metricStatLabel}>Active Orders</Text>
               </View>
 
-              <View style={[styles.metricCard, styles.metricCardIndigo]}>
-                <Text style={styles.metricLabelIndigo}>Delivery Commission</Text>
-                <View style={styles.metricValueRow}>
-                  <Text style={styles.metricValueIndigo}>₹{(scans.length * 0.5).toFixed(2)}</Text>
-                  <Text style={styles.metricUnitIndigo}> @₹0.50/can</Text>
+              {/* 2. Delivered Bottles */}
+              <View style={styles.metricCircleCol}>
+                <View style={[styles.circleBadge, styles.circleBadgeGreen]}>
+                  <BottleBadgeIcon size={26} color="#059669" />
                 </View>
+                <Text style={styles.metricStatValue}>
+                  {scans.length.toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.metricStatLabel}>Delivered</Text>
+              </View>
+
+              {/* 3. Active Routes */}
+              <View style={styles.metricCircleCol}>
+                <View style={[styles.circleBadge, styles.circleBadgeOrange]}>
+                  <TruckBadgeIcon size={25} color="#F97316" />
+                </View>
+                <Text style={styles.metricStatValue}>4</Text>
+                <Text style={styles.metricStatLabel}>Active Routes</Text>
+              </View>
+
+              {/* 4. Commission */}
+              <View style={styles.metricCircleCol}>
+                <View style={[styles.circleBadge, styles.circleBadgePurple]}>
+                  <RupeeBadgeIcon size={24} color="#7C3AED" />
+                </View>
+                <Text style={styles.metricStatValue}>
+                  ₹{(scans.length * 0.50).toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                </Text>
+                <Text style={styles.metricStatLabel}>Commission</Text>
+                <Text style={styles.metricStatSub}>@ ₹0.50/can</Text>
               </View>
             </View>
 
-            {/* Search Bar */}
+            {/* ── SEARCH BAR (Pill Rounded Search Bar Matching Attachment) ── */}
             <View style={styles.searchContainer}>
-              <Search color="#9CA3AF" size={16} style={styles.searchIcon} />
+              <Search color="#94A3B8" size={19} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search Can ID or Campaign..."
-                placeholderTextColor="#9CA3AF"
+                placeholder="Search campaign, brand, or location..."
+                placeholderTextColor="#94A3B8"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                autoCorrect={false}
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
-                  <X color="#9CA3AF" size={14} />
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearSearchBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <X color="#94A3B8" size={16} />
                 </TouchableOpacity>
               )}
+            </View>
+
+            {/* ── STATUS FILTER TABS (All | Pending | Completed Matching Attachment) ── */}
+            <View style={styles.filterPills}>
+              {(['ALL', 'PENDING', 'COMPLETED'] as const).map((tab) => {
+                const label = tab === 'ALL' ? 'All' : tab === 'PENDING' ? 'Pending' : 'Completed';
+                const isActive = activeFilter === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.filterPill, isActive && styles.filterPillActive]}
+                    onPress={() => {
+                      ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
+                      setActiveFilter(tab);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Scans List */}
@@ -1074,63 +1187,132 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
 
-  // 2 Metric Summary Tiles
-  metricGrid: {
+  // ── 4 Circular Stat Badges (Pixel-Matched to Attachment) ──
+  metricsRowWrapper: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  metricCard: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
     justifyContent: 'space-between',
-    minHeight: 74,
+    alignItems: 'flex-start',
+    paddingHorizontal: 2,
+    marginBottom: 20,
+    marginTop: 6,
   },
-  metricCardGray: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#F3F4F6',
+  metricCircleCol: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 2,
   },
-  metricCardIndigo: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
+  circleBadge: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.8,
+    marginBottom: 8,
   },
-  metricLabelGray: { fontSize: 11, fontWeight: '500', color: '#64748B' },
-  metricLabelIndigo: { fontSize: 11, fontWeight: '500', color: '#3730A3' },
-  metricValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 4,
+  circleBadgeBlue: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BAE6FD',
   },
-  metricValueDark: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  metricUnitDark: { fontSize: 12, fontWeight: '400', color: '#94A3B8' },
-  metricValueIndigo: { fontSize: 18, fontWeight: '800', color: '#312E81' },
-  metricUnitIndigo: { fontSize: 10, fontWeight: '400', color: '#4F46E5' },
+  circleBadgeGreen: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  circleBadgeOrange: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  circleBadgePurple: {
+    backgroundColor: '#FAF5FF',
+    borderColor: '#DDD6FE',
+  },
+  metricStatValue: {
+    fontSize: 16.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  metricStatLabel: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  metricStatSub: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 1,
+  },
 
-  // Search Bar
+  // ── Search Bar (Pill Rounded) ──
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#EEF2F6',
+    borderRadius: 25,
+    paddingHorizontal: 16,
     marginBottom: 14,
-    height: 40,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#111827',
+    fontSize: 13.5,
+    color: '#0F172A',
     paddingVertical: 0,
+    fontWeight: '500',
   },
   clearSearchBtn: {
     padding: 4,
+  },
+
+  // ── Filter Segment Pills (All | Pending | Completed) ──
+  filterPills: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 24,
+    padding: 4,
+    marginBottom: 16,
+    height: 46,
+    alignItems: 'center',
+  },
+  filterPill: {
+    flex: 1,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  filterPillActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#0F172A',
+    fontWeight: '800',
   },
 
   // Scans List
