@@ -28,6 +28,8 @@ import {
   Keyboard,
   ShieldCheck,
   Plus,
+  SwitchCamera,
+  Camera as CameraIcon,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
@@ -56,7 +58,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const { location, getCurrentPosition } = useLocation();
   const isPlant = role === 'WATER_PLANT';
 
-  const device = useCameraDevice('back');
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
+  const device = useCameraDevice(cameraPosition);
   const { hasPermission, requestPermission } = useCameraPermission();
 
   const [torch, setTorch] = useState(false);
@@ -70,6 +73,17 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSwitchCamera = () => {
+    SoundService.triggerImpact();
+    setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
+    setTorch(false);
+  };
+
+  const handleManualCaptureSubmit = () => {
+    const generatedQr = `CAN-QR-${Date.now().toString(36).toUpperCase()}`;
+    processScanPayload(generatedQr);
+  };
 
   // Scan debounce cache
   const lastScannedTimestamp = useRef<number>(0);
@@ -255,17 +269,28 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.topBtn, torch && styles.topBtnActive]}
-            onPress={() => setTorch(!torch)}
-            activeOpacity={0.7}
-          >
-            {torch ? (
-              <Flashlight size={20} color={COLORS.warning} />
-            ) : (
-              <FlashlightOff size={20} color={COLORS.white} />
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              style={styles.topBtn}
+              onPress={handleSwitchCamera}
+              activeOpacity={0.7}
+            >
+              <SwitchCamera size={20} color="#38BDF8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.topBtn, torch && styles.topBtnActive]}
+              onPress={() => setTorch(!torch)}
+              activeOpacity={0.7}
+              disabled={cameraPosition === 'front'}
+            >
+              {torch ? (
+                <Flashlight size={20} color={COLORS.warning} />
+              ) : (
+                <FlashlightOff size={20} color={cameraPosition === 'front' ? '#4B5563' : COLORS.white} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Camera Scanner View */}
@@ -276,7 +301,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
               device={device}
               isActive={visible}
               codeScanner={codeScanner}
-              torch={torch ? 'on' : 'off'}
+              torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
             />
           ) : (
             <View style={styles.permissionBox}>
@@ -340,7 +365,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           </View>
         </View>
 
-        {/* Bottom Metrics & Actions Panel */}
+        {/* Bottom Metrics & Actions Panel (Capture & Submit at Bottom) */}
         <View style={styles.bottomPanel}>
           <View style={styles.sessionStatsRow}>
             <View>
@@ -367,6 +392,48 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 <Text style={styles.boostBtnText}>+500</Text>
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Bottom Controls Bar */}
+          <View style={styles.modalBottomControls}>
+            <TouchableOpacity
+              style={[styles.modalAuxBtn, torch && styles.modalAuxBtnActive]}
+              onPress={() => setTorch(!torch)}
+              activeOpacity={0.7}
+              disabled={cameraPosition === 'front'}
+            >
+              {torch ? (
+                <Flashlight size={20} color={COLORS.warning} />
+              ) : (
+                <FlashlightOff size={20} color={cameraPosition === 'front' ? '#4B5563' : COLORS.white} />
+              )}
+              <Text style={[styles.modalAuxText, torch && { color: COLORS.warning }]}>
+                {torch ? 'Torch ON' : 'Torch'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCaptureSubmitBtn}
+              onPress={handleManualCaptureSubmit}
+              disabled={isSubmitting}
+              activeOpacity={0.85}
+            >
+              <View style={styles.modalCaptureCircle}>
+                <CameraIcon size={20} color={COLORS.white} />
+              </View>
+              <Text style={styles.modalCaptureText}>Capture & Submit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalAuxBtn}
+              onPress={handleSwitchCamera}
+              activeOpacity={0.7}
+            >
+              <SwitchCamera size={20} color="#38BDF8" />
+              <Text style={styles.modalAuxText}>
+                {cameraPosition === 'back' ? 'Front Cam' : 'Back Cam'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Manual Input Toggle */}
@@ -622,6 +689,59 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.xs,
     fontWeight: '800',
     color: COLORS.white,
+  },
+  modalBottomControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginVertical: SPACING.xs,
+  },
+  modalCaptureSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.distributorAccent,
+    paddingHorizontal: SPACING.lg + 4,
+    paddingVertical: SPACING.sm + 4,
+    borderRadius: RADIUS.full,
+    shadowColor: COLORS.distributorAccent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalCaptureCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCaptureText: {
+    ...TYPOGRAPHY.xs,
+    fontWeight: '900',
+    color: COLORS.white,
+  },
+  modalAuxBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 64,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.slate800,
+    gap: 3,
+  },
+  modalAuxBtnActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  modalAuxText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.slate300,
   },
   manualEntryBtn: {
     flexDirection: 'row',

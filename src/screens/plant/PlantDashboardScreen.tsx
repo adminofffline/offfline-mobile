@@ -32,7 +32,10 @@ import {
   Droplets,
   MapPin,
   Check,
-  AlertCircle
+  AlertCircle,
+  SwitchCamera,
+  Flashlight,
+  FlashlightOff,
 } from 'lucide-react-native';
 import {
   Camera as VisionCamera,
@@ -74,7 +77,7 @@ interface SettlementRecord {
 }
 
 const CHENNAI_ZONES = [
-  'Chennai (All)',
+  'All Chennai Plant Facilities',
   'Park Town (600003)',
   'Kilpauk (600010)',
   'Egmore (600008)',
@@ -90,7 +93,12 @@ const INITIAL_BENCHMARK_ORDERS: BottlingOrder[] = [
   { id: 'CMP_12345_0987654321', campaign: '12345-0987654321', brand: '12345-0987654321', location: 'Chennai (600001)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
   { id: 'CMP_jaya', campaign: 'jaya', brand: 'Jaya Pure Beverages', location: 'Chennai (600003)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
   { id: 'CMP_deepika123', campaign: 'deepika123', brand: 'Deepika Beverages', location: 'Chennai (600006)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
-  { id: 'CMP_dyn_test', campaign: 'DYNAMIC_TEST_CAMPAIGN_1788372145669', brand: 'Dynamic Test Brand', location: 'Chennai (600001)', quantityNum: 5000, bottledNum: 0, status: 'PENDING', revenue: 2500 },
+  { id: 'CMP_98765_5432109876', campaign: '98765-5432109876', brand: '98765-5432109876', location: 'Chennai (600008)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
+  { id: 'CMP_nissan', campaign: 'nissan', brand: 'Nissan Motor Corp', location: 'Chennai (600010)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
+  { id: 'CMP_samsung', campaign: 'samsung', brand: 'Samsung Electronics', location: 'Chennai (600017)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
+  { id: 'CMP_nestle', campaign: 'nestle', brand: 'Nestle India Ltd', location: 'Chennai (600020)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
+  { id: 'CMP_apollo', campaign: 'apollo', brand: 'Apollo Hospitals', location: 'Chennai (600040)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
+  { id: 'CMP_zomato', campaign: 'zomato', brand: 'Zomato Limited', location: 'Chennai (600042)', quantityNum: 4000, bottledNum: 0, status: 'PENDING', revenue: 2000 },
 ];
 
 export function PlantDashboardScreen({ navigation }: any) {
@@ -332,8 +340,19 @@ export function PlantDashboardScreen({ navigation }: any) {
 
   // ── Real Camera & Vision Code Scanner ──
   const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
-  const cameraDevice = useCameraDevice('back');
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
+  const [torch, setTorch] = useState(false);
+  const cameraDevice = useCameraDevice(cameraPosition);
   const isProcessingScanRef = useRef(false);
+
+  const handleSwitchCamera = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('selection', {
+      enableVibrateFallback: true,
+      ignoreAndroidSystemSettings: false,
+    });
+    setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
+    setTorch(false);
+  }, []);
 
   useEffect(() => {
     if (showQrModal && !hasCameraPermission) {
@@ -567,15 +586,30 @@ export function PlantDashboardScreen({ navigation }: any) {
               <View style={styles.locationRight}>
                 <TouchableOpacity
                   style={styles.scanCansBtn}
-                  onPress={() => setShowQrModal(true)}
+                  onPress={() => {
+                    if (filteredOrders.length > 0) {
+                      setSelectedScanCampaign(filteredOrders[0]);
+                    }
+                    setShowQrModal(true);
+                  }}
                   activeOpacity={0.85}
                 >
                   <QrCode color="#fff" size={14} />
                   <Text style={styles.scanCansBtnText}>Scan Cans</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setCurrentLocationDisplay('Chennai')}>
-                  <Text style={styles.viewAllText}>View All</Text>
-                </TouchableOpacity>
+                {currentLocationDisplay !== 'All Chennai Plant Facilities' &&
+                  currentLocationDisplay !== 'Chennai (All)' &&
+                  currentLocationDisplay !== 'ALL' && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setCurrentLocationDisplay('All Chennai Plant Facilities');
+                        triggerToast('Showing all plant facilities');
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Text style={styles.viewAllText}>View All</Text>
+                    </TouchableOpacity>
+                  )}
               </View>
             </View>
 
@@ -855,26 +889,42 @@ export function PlantDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: QR SCANNER WITH LIVE SERVER SYNC ── */}
       <Modal
         visible={showQrModal}
-        animationType="fade"
-        transparent
+        animationType="slide"
+        transparent={false}
         onRequestClose={() => setShowQrModal(false)}
       >
-        <View style={styles.scannerModalOverlay}>
+        <SafeAreaView style={styles.scannerModalOverlay}>
+          <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+
+          {/* Scanner Top Bar */}
           <View style={styles.scannerHeader}>
-            <Text style={styles.scannerTitle}>Scan QR Code</Text>
+            <View style={styles.scannerHeaderLeft}>
+              <Text style={styles.scannerTitle}>Scan QR Code</Text>
+              <Text style={styles.scannerSubtitle}>
+                {selectedScanCampaign ? selectedScanCampaign.campaign : 'Active Bottling Line'}
+              </Text>
+            </View>
             <View style={styles.scannerHeaderRight}>
-              <TouchableOpacity style={styles.scannerIconBtn} onPress={handlePerformLiveScan}>
-                <CameraIcon color="#FFFFFF" size={22} />
+              <TouchableOpacity
+                style={styles.scannerHeaderSwitchBtn}
+                onPress={handleSwitchCamera}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <SwitchCamera color="#38BDF8" size={22} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.scannerIconBtn}
                 onPress={() => setShowQrModal(false)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
-                <X color="#FFFFFF" size={22} />
+                <X color="#FFFFFF" size={24} />
               </TouchableOpacity>
             </View>
           </View>
 
+          {/* Camera Viewfinder Area */}
           <View style={styles.scannerBody} pointerEvents="box-none">
             {hasCameraPermission && cameraDevice != null && showQrModal ? (
               <VisionCamera
@@ -882,6 +932,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                 device={cameraDevice}
                 isActive={showQrModal}
                 codeScanner={codeScanner}
+                torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
                 enableZoomGesture
               />
             ) : null}
@@ -916,43 +967,64 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <Text style={styles.standbySub}>
                     {selectedScanCampaign ? `Active: ${selectedScanCampaign.campaign}` : 'Ready for telemetry scans'}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.retryCameraBtn}
-                    onPress={handlePerformLiveScan}
-                    activeOpacity={0.8}
-                  >
-                    <CameraIcon color="#FFFFFF" size={16} />
-                    <Text style={styles.retryCameraBtnText}>Capture & Submit Scan</Text>
-                  </TouchableOpacity>
                 </View>
-              ) : (
-                <View style={styles.activeOverlayControls} pointerEvents="auto">
-                  <TouchableOpacity
-                    style={styles.retryCameraBtn}
-                    onPress={handlePerformLiveScan}
-                    activeOpacity={0.8}
-                  >
-                    <CameraIcon color="#FFFFFF" size={16} />
-                    <Text style={styles.retryCameraBtnText}>Capture & Submit Scan</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              ) : null}
             </View>
           </View>
 
+          {/* Bottom Action & Controls Panel (Capture & Submit at the Bottom) */}
           <View style={styles.scannerFooter}>
-            <View style={styles.scannerFootRow}>
-              <QrCode color="#34D399" size={16} />
-              <Text style={styles.scannerFootText}>Position the QR code within the frame to scan</Text>
-            </View>
             <View style={styles.scannedCounterRow}>
               <View style={styles.scannedPulseDot} />
               <Text style={styles.scannedCounterText}>
                 Scanned: <Text style={styles.scannedCountBold}>{scannerCount}</Text> / {selectedScanCampaign ? selectedScanCampaign.quantityNum.toLocaleString() : '4,000'} Cans
               </Text>
             </View>
+
+            <View style={styles.bottomControlBar}>
+              {/* Torch Auxiliary Button */}
+              <TouchableOpacity
+                style={[styles.cameraAuxBtn, torch && styles.cameraAuxBtnActive]}
+                onPress={() => setTorch(!torch)}
+                activeOpacity={0.7}
+                disabled={cameraPosition === 'front'}
+              >
+                {torch ? (
+                  <Flashlight color="#FBBF24" size={22} />
+                ) : (
+                  <FlashlightOff color={cameraPosition === 'front' ? '#4B5563' : '#FFFFFF'} size={22} />
+                )}
+                <Text style={[styles.cameraAuxText, torch && { color: '#FBBF24' }]}>
+                  {torch ? 'Torch ON' : 'Torch'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Primary Capture & Submit Button (Bottom-Oriented) */}
+              <TouchableOpacity
+                style={styles.primaryCaptureBtn}
+                onPress={handlePerformLiveScan}
+                activeOpacity={0.85}
+              >
+                <View style={styles.captureInnerCircle}>
+                  <CameraIcon color="#FFFFFF" size={20} />
+                </View>
+                <Text style={styles.primaryCaptureText}>Capture & Submit</Text>
+              </TouchableOpacity>
+
+              {/* Switch Camera Auxiliary Button */}
+              <TouchableOpacity
+                style={styles.cameraAuxBtn}
+                onPress={handleSwitchCamera}
+                activeOpacity={0.7}
+              >
+                <SwitchCamera color="#38BDF8" size={22} />
+                <Text style={styles.cameraAuxText}>
+                  {cameraPosition === 'back' ? 'Front Cam' : 'Back Cam'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* ── MODAL 2: LOCATION PICKER ── */}
@@ -971,7 +1043,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                   key={zone}
                   style={styles.zoneItem}
                   onPress={() => {
-                    setCurrentLocationDisplay(zone === 'Chennai (All)' ? 'Chennai' : zone);
+                    setCurrentLocationDisplay(zone);
                     setShowLocationPicker(false);
                     triggerToast(`Filtered for ${zone}`);
                   }}
@@ -1735,28 +1807,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0B0F19',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 44 : 20,
-    paddingBottom: 30,
   },
   scannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(11, 15, 25, 0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  scannerHeaderLeft: {
+    flex: 1,
   },
   scannerTitle: {
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  scannerSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#94A3B8',
+    marginTop: 2,
   },
   scannerHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
+  },
+  scannerHeaderSwitchBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
   },
   scannerIconBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scannerBody: {
     flex: 1,
@@ -1772,46 +1870,46 @@ const styles = StyleSheet.create({
   },
   cornerBracket: {
     position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#34D399',
+    width: 28,
+    height: 28,
+    borderColor: '#38BDF8',
   },
   cornerTopLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: 3.5,
-    borderLeftWidth: 3.5,
-    borderTopLeftRadius: 10,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 12,
   },
   cornerTopRight: {
     top: 0,
     right: 0,
-    borderTopWidth: 3.5,
-    borderRightWidth: 3.5,
-    borderTopRightRadius: 10,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 12,
   },
   cornerBottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: 3.5,
-    borderLeftWidth: 3.5,
-    borderBottomLeftRadius: 10,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 12,
   },
   cornerBottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: 3.5,
-    borderRightWidth: 3.5,
-    borderBottomRightRadius: 10,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 12,
   },
   standbyContent: {
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   cameraIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#0F231D',
     borderWidth: 1,
     borderColor: '#065F46',
@@ -1821,26 +1919,26 @@ const styles = StyleSheet.create({
   },
   standbyTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 4,
   },
   standbySub: {
     color: '#9CA3AF',
-    fontSize: 10,
+    fontSize: 11,
     textAlign: 'center',
     marginBottom: 14,
-    lineHeight: 14,
+    lineHeight: 16,
   },
   retryCameraBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#059669',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   retryCameraBtnText: {
     color: '#FFFFFF',
@@ -1848,38 +1946,92 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scannerFooter: {
+    backgroundColor: 'rgba(11, 15, 25, 0.96)',
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
     alignItems: 'center',
-    gap: 8,
-  },
-  scannerFootRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  scannerFootText: {
-    color: '#D1D5DB',
-    fontSize: 12,
-    fontWeight: '500',
+    gap: 12,
   },
   scannedCounterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 2,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   scannedPulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#34D399',
   },
   scannedCounterText: {
-    color: '#9CA3AF',
+    color: '#94A3B8',
     fontSize: 12,
   },
   scannedCountBold: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: '800',
+  },
+  bottomControlBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  primaryCaptureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#0891B2',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 28,
+    shadowColor: '#0891B2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  captureInnerCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryCaptureText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  cameraAuxBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 68,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#1E293B',
+    gap: 4,
+  },
+  cameraAuxBtnActive: {
+    backgroundColor: '#422006',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  cameraAuxText: {
+    color: '#E2E8F0',
+    fontSize: 10,
+    fontWeight: '600',
   },
 
   // ── Profile Modal ──
