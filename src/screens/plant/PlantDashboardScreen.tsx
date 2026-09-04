@@ -497,12 +497,14 @@ export function PlantDashboardScreen({ navigation }: any) {
       if (activeFilter === 'COMPLETED' && order.status !== 'COMPLETED') return false;
       if (activeFilter === 'PENDING' && order.status === 'COMPLETED') return false;
 
-      // Location Filter
+      // Location Filter: Matches all if global/All Chennai Plant Facilities/Chennai
       const isGlobalLocation =
         !currentLocationDisplay ||
         currentLocationDisplay === 'Chennai' ||
         currentLocationDisplay === 'Chennai (All)' ||
-        currentLocationDisplay.toLowerCase() === 'all';
+        currentLocationDisplay === 'All Chennai Plant Facilities' ||
+        currentLocationDisplay.toLowerCase().includes('all') ||
+        currentLocationDisplay.toLowerCase() === 'chennai';
 
       if (!isGlobalLocation) {
         const targetZonePincode = currentLocationDisplay.match(/\((\d{6})\)/)?.[1];
@@ -580,7 +582,9 @@ export function PlantDashboardScreen({ navigation }: any) {
                 activeOpacity={0.7}
               >
                 <MapPin color="#0891B2" size={15} />
-                <Text style={styles.locationText}>{currentLocationDisplay}</Text>
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {currentLocationDisplay}
+                </Text>
               </TouchableOpacity>
               
               <View style={styles.locationRight}>
@@ -597,19 +601,19 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <QrCode color="#fff" size={14} />
                   <Text style={styles.scanCansBtnText}>Scan Cans</Text>
                 </TouchableOpacity>
-                {currentLocationDisplay !== 'All Chennai Plant Facilities' &&
-                  currentLocationDisplay !== 'Chennai (All)' &&
-                  currentLocationDisplay !== 'ALL' && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setCurrentLocationDisplay('All Chennai Plant Facilities');
-                        triggerToast('Showing all plant facilities');
-                      }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Text style={styles.viewAllText}>View All</Text>
-                    </TouchableOpacity>
-                  )}
+                <TouchableOpacity
+                  style={styles.viewAllBtn}
+                  onPress={() => {
+                    setCurrentLocationDisplay('All Chennai Plant Facilities');
+                    setActiveFilter('ALL');
+                    setSearchQuery('');
+                    triggerToast('✓ Showing all work orders & plant facilities');
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -943,6 +947,17 @@ export function PlantDashboardScreen({ navigation }: any) {
               <View style={[styles.cornerBracket, styles.cornerBottomLeft]} />
               <View style={[styles.cornerBracket, styles.cornerBottomRight]} />
 
+              {/* Holographic Center-Lower Shutter Ring */}
+              <TouchableOpacity
+                style={styles.viewfinderShutterCircle}
+                onPress={handlePerformLiveScan}
+                activeOpacity={0.75}
+              >
+                <View style={styles.viewfinderShutterOuter}>
+                  <View style={styles.viewfinderShutterInner} />
+                </View>
+              </TouchableOpacity>
+
               {!hasCameraPermission ? (
                 <View style={styles.standbyContent} pointerEvents="auto">
                   <View style={styles.cameraIconCircle}>
@@ -977,7 +992,7 @@ export function PlantDashboardScreen({ navigation }: any) {
             <View style={styles.scannedCounterRow}>
               <View style={styles.scannedPulseDot} />
               <Text style={styles.scannedCounterText}>
-                Scanned: <Text style={styles.scannedCountBold}>{scannerCount}</Text> / {selectedScanCampaign ? selectedScanCampaign.quantityNum.toLocaleString() : '4,000'} Cans
+                Scanned: <Text style={styles.scannedCountBold}>{scannerCount}</Text> / {selectedScanCampaign ? selectedScanCampaign.quantityNum.toLocaleString() : '30,000'} Cans
               </Text>
             </View>
 
@@ -990,9 +1005,9 @@ export function PlantDashboardScreen({ navigation }: any) {
                 disabled={cameraPosition === 'front'}
               >
                 {torch ? (
-                  <Flashlight color="#FBBF24" size={22} />
+                  <Flashlight color="#FBBF24" size={24} />
                 ) : (
-                  <FlashlightOff color={cameraPosition === 'front' ? '#4B5563' : '#FFFFFF'} size={22} />
+                  <FlashlightOff color={cameraPosition === 'front' ? '#4B5563' : '#FFFFFF'} size={24} />
                 )}
                 <Text style={[styles.cameraAuxText, torch && { color: '#FBBF24' }]}>
                   {torch ? 'Torch ON' : 'Torch'}
@@ -1006,7 +1021,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                 activeOpacity={0.85}
               >
                 <View style={styles.captureInnerCircle}>
-                  <CameraIcon color="#FFFFFF" size={20} />
+                  <CameraIcon color="#FFFFFF" size={22} />
                 </View>
                 <Text style={styles.primaryCaptureText}>Capture & Submit</Text>
               </TouchableOpacity>
@@ -1017,7 +1032,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                 onPress={handleSwitchCamera}
                 activeOpacity={0.7}
               >
-                <SwitchCamera color="#38BDF8" size={22} />
+                <SwitchCamera color="#38BDF8" size={24} />
                 <Text style={styles.cameraAuxText}>
                   {cameraPosition === 'back' ? 'Front Cam' : 'Back Cam'}
                 </Text>
@@ -1365,10 +1380,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  viewAllBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   viewAllText: {
     color: '#0891B2',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
 
   // ── 4 Metric Tiles (2x2 Grid) ──
@@ -1814,7 +1836,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: 'rgba(11, 15, 25, 0.95)',
+    backgroundColor: '#0B1120',
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
   },
@@ -1822,13 +1844,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scannerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   scannerSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
     color: '#94A3B8',
     marginTop: 2,
@@ -1839,19 +1861,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   scannerHeaderSwitchBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1E293B',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#38BDF8',
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
   },
   scannerIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#1E293B',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1862,45 +1884,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   viewfinderFrame: {
-    width: width * 0.72,
-    height: width * 0.72,
+    width: width * 0.76,
+    height: width * 0.76,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cornerBracket: {
     position: 'absolute',
-    width: 28,
-    height: 28,
-    borderColor: '#38BDF8',
+    width: 46,
+    height: 46,
+    borderColor: '#00B4D8',
   },
   cornerTopLeft: {
     top: 0,
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 12,
+    borderTopLeftRadius: 18,
   },
   cornerTopRight: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 12,
+    borderTopRightRadius: 18,
   },
   cornerBottomLeft: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 12,
+    borderBottomLeftRadius: 18,
   },
   cornerBottomRight: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 12,
+    borderBottomRightRadius: 18,
+  },
+  viewfinderShutterCircle: {
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    borderWidth: 2.5,
+    borderColor: '#38BDF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.75,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  viewfinderShutterOuter: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewfinderShutterInner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#00A3C4',
   },
   standbyContent: {
     alignItems: 'center',
@@ -1946,33 +2000,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scannerFooter: {
-    backgroundColor: 'rgba(11, 15, 25, 0.96)',
+    backgroundColor: '#0B1120',
     borderTopWidth: 1,
     borderTopColor: '#1E293B',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 20,
     alignItems: 'center',
     gap: 12,
   },
   scannedCounterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     backgroundColor: '#1E293B',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   scannedPulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#34D399',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
   },
   scannedCounterText: {
     color: '#94A3B8',
     fontSize: 12,
+    fontWeight: '500',
   },
   scannedCountBold: {
     color: '#FFFFFF',
@@ -1983,45 +2040,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 8,
-    marginTop: 4,
+    gap: 10,
+    marginTop: 2,
   },
   primaryCaptureBtn: {
+    flex: 1,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#0891B2',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 28,
-    shadowColor: '#0891B2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    backgroundColor: '#00A3C4',
+    borderRadius: 32,
+    shadowColor: '#00A3C4',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 10,
   },
   captureInnerCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryCaptureText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
   cameraAuxBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 68,
-    paddingVertical: 8,
-    borderRadius: 14,
+    width: 74,
+    height: 64,
+    borderRadius: 18,
     backgroundColor: '#1E293B',
     gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   cameraAuxBtnActive: {
     backgroundColor: '#422006',
@@ -2030,7 +2090,7 @@ const styles = StyleSheet.create({
   },
   cameraAuxText: {
     color: '#E2E8F0',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
 
