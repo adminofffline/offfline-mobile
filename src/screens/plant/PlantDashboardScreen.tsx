@@ -52,6 +52,7 @@ import { authApi } from '../../api/auth';
 import { brandApi } from '../../api/brand';
 import { api } from '../../api/client';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
+import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
 
 const { width } = Dimensions.get('window');
 
@@ -907,61 +908,27 @@ export function PlantDashboardScreen({ navigation }: any) {
         )}
       </ScrollView>
 
-      {/* ── 4. FIXED BOTTOM NAVIGATION BAR ── */}
-      <View style={styles.bottomNav}>
-        {/* Left: Work Orders Tab */}
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab('work-orders')}
-          activeOpacity={0.8}
-        >
-          <FileText
-            color={activeTab === 'work-orders' ? '#0891B2' : '#94A3B8'}
-            size={22}
-          />
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === 'work-orders' && styles.navTabTextActive,
-            ]}
-          >
-            Work Orders
-          </Text>
-        </TouchableOpacity>
-
-        {/* Center: Floating Cyan QR Scanner Button */}
-        <View style={styles.floatingCenterWrap}>
-          <TouchableOpacity
-            style={styles.floatingQrBtn}
-            onPress={() => {
-              setShowQrModal(true);
-            }}
-            activeOpacity={0.85}
-          >
-            <QrCode color="#FFFFFF" size={26} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Right: Settlement Tab */}
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab('settlement-report')}
-          activeOpacity={0.8}
-        >
-          <TrendingUp
-            color={activeTab === 'settlement-report' ? '#0891B2' : '#94A3B8'}
-            size={22}
-          />
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === 'settlement-report' && styles.navTabTextActive,
-            ]}
-          >
-            Settlement
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* ── 4. FIXED LIQUID GLASS BOTTOM NAVIGATION BAR ── */}
+      <LiquidGlassNavBar
+        leftTab={{
+          key: 'work-orders',
+          label: 'Work Orders',
+          icon: FileText,
+        }}
+        rightTab={{
+          key: 'settlement-report',
+          label: 'Settlement',
+          icon: TrendingUp,
+        }}
+        activeTab={activeTab}
+        onSelectTab={(tabKey) => setActiveTab(tabKey as any)}
+        onPressCenterScan={() => {
+          if (filteredOrders.length > 0) {
+            setSelectedScanCampaign(filteredOrders[0]);
+          }
+          setShowQrModal(true);
+        }}
+      />
 
       {/* ── MODAL 1: QR SCANNER WITH LIVE SERVER SYNC ── */}
       <Modal

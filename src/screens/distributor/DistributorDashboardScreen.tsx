@@ -50,6 +50,7 @@ import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
+import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
 
 const { width } = Dimensions.get('window');
 
@@ -504,6 +505,15 @@ export function DistributorDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadProductionData();
+            }}
+          />
+        }
       >
         {activeTab === 'scan-reports' ? (
           <>
@@ -653,59 +663,22 @@ export function DistributorDashboardScreen({ navigation }: any) {
         )}
       </ScrollView>
 
-      {/* ── 4. FIXED BOTTOM NAVIGATION BAR ── */}
-      <View style={styles.bottomNav}>
-        {/* Left: Scan Report Tab */}
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab('scan-reports')}
-          activeOpacity={0.8}
-        >
-          <FileText
-            color={activeTab === 'scan-reports' ? '#4F46E5' : '#94A3B8'}
-            size={22}
-          />
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === 'scan-reports' && styles.navTabTextActiveIndigo,
-            ]}
-          >
-            Scan Report
-          </Text>
-        </TouchableOpacity>
-
-        {/* Center: Floating Indigo QR Scanner Button */}
-        <View style={styles.floatingCenterWrap}>
-          <TouchableOpacity
-            style={styles.floatingQrBtn}
-            onPress={() => setShowQrModal(true)}
-            activeOpacity={0.85}
-          >
-            <QrCode color="#FFFFFF" size={26} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Right: Settlement Tab */}
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab('settlement-report')}
-          activeOpacity={0.8}
-        >
-          <TrendingUp
-            color={activeTab === 'settlement-report' ? '#4F46E5' : '#94A3B8'}
-            size={22}
-          />
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === 'settlement-report' && styles.navTabTextActiveIndigo,
-            ]}
-          >
-            Settlement
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* ── 4. FIXED LIQUID GLASS BOTTOM NAVIGATION BAR ── */}
+      <LiquidGlassNavBar
+        leftTab={{
+          key: 'scan-reports',
+          label: 'Scan Report',
+          icon: FileText,
+        }}
+        rightTab={{
+          key: 'settlement-report',
+          label: 'Settlement',
+          icon: TrendingUp,
+        }}
+        activeTab={activeTab}
+        onSelectTab={(tabKey) => setActiveTab(tabKey as any)}
+        onPressCenterScan={() => setShowQrModal(true)}
+      />
 
       {/* ── MODAL 1: QR SCANNER MODAL WITH LIVE PRODUCTION SYNC ── */}
       <Modal
