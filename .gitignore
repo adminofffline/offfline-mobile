@@ -29,6 +29,7 @@ ios/*.xcworkspace
 ios/*.xcodeproj/xcuserdata/
 ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 ios/Podfile.lock
+ios/.xcode.env.local
 
 # Environment
 .env.local
