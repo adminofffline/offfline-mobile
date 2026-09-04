@@ -12,7 +12,8 @@ import {
   Modal,
   Dimensions,
   Platform,
-  StatusBar
+  StatusBar,
+  Animated,
 } from 'react-native';
 import {
   FileText,
@@ -344,6 +345,28 @@ export function PlantDashboardScreen({ navigation }: any) {
   const [torch, setTorch] = useState(false);
   const cameraDevice = useCameraDevice(cameraPosition);
   const isProcessingScanRef = useRef(false);
+  const laserAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showQrModal) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(laserAnim, {
+            toValue: 1,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(laserAnim, {
+            toValue: 0,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      anim.start();
+      return () => anim.stop();
+    }
+  }, [showQrModal, laserAnim]);
 
   const handleSwitchCamera = useCallback(() => {
     ReactNativeHapticFeedback.trigger('selection', {
@@ -893,70 +916,74 @@ export function PlantDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: QR SCANNER WITH LIVE SERVER SYNC ── */}
       <Modal
         visible={showQrModal}
-        animationType="slide"
+        animationType="fade"
         transparent={false}
         onRequestClose={() => setShowQrModal(false)}
       >
-        <SafeAreaView style={styles.scannerModalOverlay}>
-          <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+        <View style={styles.scannerModalOverlay}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-          {/* Scanner Top Bar */}
-          <View style={styles.scannerHeader}>
-            <View style={styles.scannerHeaderLeft}>
-              <Text style={styles.scannerTitle}>Scan QR Code</Text>
-              <Text style={styles.scannerSubtitle}>
-                {selectedScanCampaign ? selectedScanCampaign.campaign : 'Active Bottling Line'}
-              </Text>
-            </View>
-            <View style={styles.scannerHeaderRight}>
-              <TouchableOpacity
-                style={styles.scannerHeaderSwitchBtn}
-                onPress={handleSwitchCamera}
-                activeOpacity={0.7}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <SwitchCamera color="#38BDF8" size={22} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.scannerIconBtn}
-                onPress={() => setShowQrModal(false)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <X color="#FFFFFF" size={24} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          {/* Fullscreen Camera Stream */}
+          {hasCameraPermission && cameraDevice != null && showQrModal ? (
+            <VisionCamera
+              style={StyleSheet.absoluteFill}
+              device={cameraDevice}
+              isActive={showQrModal}
+              codeScanner={codeScanner}
+              torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
+              enableZoomGesture
+            />
+          ) : null}
 
-          {/* Camera Viewfinder Area */}
+          {/* ── 1. FLOATING TOP HEADER ── */}
+          <SafeAreaView style={styles.floatingHeaderSafeArea}>
+            <View style={styles.floatingHeaderContainer}>
+              <Text style={styles.floatingHeaderTitle}>Scan QR Code</Text>
+              <View style={styles.floatingHeaderActions}>
+                <TouchableOpacity
+                  style={styles.floatingCircleBtn}
+                  onPress={handleSwitchCamera}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <SwitchCamera color="#FFFFFF" size={20} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.floatingCircleBtn}
+                  onPress={() => setShowQrModal(false)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <X color="#FFFFFF" size={20} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+
+          {/* ── 2. CENTER VIEWFINDER RETICLE ── */}
           <View style={styles.scannerBody} pointerEvents="box-none">
-            {hasCameraPermission && cameraDevice != null && showQrModal ? (
-              <VisionCamera
-                style={StyleSheet.absoluteFill}
-                device={cameraDevice}
-                isActive={showQrModal}
-                codeScanner={codeScanner}
-                torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
-                enableZoomGesture
-              />
-            ) : null}
-
             <View style={styles.viewfinderFrame} pointerEvents="box-none">
               <View style={[styles.cornerBracket, styles.cornerTopLeft]} />
               <View style={[styles.cornerBracket, styles.cornerTopRight]} />
               <View style={[styles.cornerBracket, styles.cornerBottomLeft]} />
               <View style={[styles.cornerBracket, styles.cornerBottomRight]} />
 
-              {/* Holographic Center-Lower Shutter Ring */}
-              <TouchableOpacity
-                style={styles.viewfinderShutterCircle}
-                onPress={handlePerformLiveScan}
-                activeOpacity={0.75}
-              >
-                <View style={styles.viewfinderShutterOuter}>
-                  <View style={styles.viewfinderShutterInner} />
-                </View>
-              </TouchableOpacity>
+              {/* Animated Laser Scanning Line */}
+              <Animated.View
+                style={[
+                  styles.laserLine,
+                  {
+                    transform: [
+                      {
+                        translateY: laserAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, width * 0.74],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
 
               {!hasCameraPermission ? (
                 <View style={styles.standbyContent} pointerEvents="auto">
@@ -987,59 +1014,23 @@ export function PlantDashboardScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bottom Action & Controls Panel (Capture & Submit at the Bottom) */}
-          <View style={styles.scannerFooter}>
-            <View style={styles.scannedCounterRow}>
-              <View style={styles.scannedPulseDot} />
-              <Text style={styles.scannedCounterText}>
-                Scanned: <Text style={styles.scannedCountBold}>{scannerCount}</Text> / {selectedScanCampaign ? selectedScanCampaign.quantityNum.toLocaleString() : '30,000'} Cans
-              </Text>
-            </View>
+          {/* ── 3. FLOATING BOTTOM INSTRUCTION & COUNTER ── */}
+          <SafeAreaView style={styles.floatingBottomSafeArea}>
+            <View style={styles.floatingBottomContainer}>
+              <View style={styles.floatingInstructionRow}>
+                <QrCode color="#2DD4BF" size={17} />
+                <Text style={styles.floatingInstructionText}>Position the QR code within the frame to scan</Text>
+              </View>
 
-            <View style={styles.bottomControlBar}>
-              {/* Torch Auxiliary Button */}
-              <TouchableOpacity
-                style={[styles.cameraAuxBtn, torch && styles.cameraAuxBtnActive]}
-                onPress={() => setTorch(!torch)}
-                activeOpacity={0.7}
-                disabled={cameraPosition === 'front'}
-              >
-                {torch ? (
-                  <Flashlight color="#FBBF24" size={24} />
-                ) : (
-                  <FlashlightOff color={cameraPosition === 'front' ? '#4B5563' : '#FFFFFF'} size={24} />
-                )}
-                <Text style={[styles.cameraAuxText, torch && { color: '#FBBF24' }]}>
-                  {torch ? 'Torch ON' : 'Torch'}
+              <View style={styles.floatingScannedRow}>
+                <View style={styles.floatingPulseDot} />
+                <Text style={styles.floatingScannedText}>
+                  Scanned: <Text style={styles.floatingScannedBold}>{scannerCount}</Text> / {selectedScanCampaign ? selectedScanCampaign.quantityNum.toLocaleString() : '4000'} Cans
                 </Text>
-              </TouchableOpacity>
-
-              {/* Primary Capture & Submit Button (Bottom-Oriented) */}
-              <TouchableOpacity
-                style={styles.primaryCaptureBtn}
-                onPress={handlePerformLiveScan}
-                activeOpacity={0.85}
-              >
-                <View style={styles.captureInnerCircle}>
-                  <CameraIcon color="#FFFFFF" size={22} />
-                </View>
-                <Text style={styles.primaryCaptureText}>Capture & Submit</Text>
-              </TouchableOpacity>
-
-              {/* Switch Camera Auxiliary Button */}
-              <TouchableOpacity
-                style={styles.cameraAuxBtn}
-                onPress={handleSwitchCamera}
-                activeOpacity={0.7}
-              >
-                <SwitchCamera color="#38BDF8" size={24} />
-                <Text style={styles.cameraAuxText}>
-                  {cameraPosition === 'back' ? 'Front Cam' : 'Back Cam'}
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </SafeAreaView>
+          </SafeAreaView>
+        </View>
       </Modal>
 
       {/* ── MODAL 2: LOCATION PICKER ── */}
@@ -1824,137 +1815,110 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
-  // ── Scanner Modal ──
+  // ── Floating Transparent Scanner Layout (Matching User Reference) ──
   scannerModalOverlay: {
     flex: 1,
-    backgroundColor: '#0B0F19',
-    justifyContent: 'space-between',
+    backgroundColor: '#000000',
+    position: 'relative',
   },
-  scannerHeader: {
+  floatingHeaderSafeArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  floatingHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#0B1120',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 36 : 10,
+    paddingBottom: 10,
   },
-  scannerHeaderLeft: {
-    flex: 1,
-  },
-  scannerTitle: {
-    fontSize: 18,
+  floatingHeaderTitle: {
+    fontSize: 22,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 6,
+    letterSpacing: -0.3,
   },
-  scannerSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  scannerHeaderRight: {
+  floatingHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  scannerHeaderSwitchBtn: {
+  floatingCircleBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#0F172A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#0284C7',
-  },
-  scannerIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   scannerBody: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   viewfinderFrame: {
-    width: width * 0.76,
-    height: width * 0.76,
+    width: width * 0.74,
+    height: width * 0.74,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cornerBracket: {
     position: 'absolute',
-    width: 46,
-    height: 46,
-    borderColor: '#00B4D8',
+    width: 48,
+    height: 48,
+    borderColor: '#2DD4BF',
   },
   cornerTopLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 18,
+    borderTopWidth: 5,
+    borderLeftWidth: 5,
+    borderTopLeftRadius: 20,
   },
   cornerTopRight: {
     top: 0,
     right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 18,
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderTopRightRadius: 20,
   },
   cornerBottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 18,
+    borderBottomWidth: 5,
+    borderLeftWidth: 5,
+    borderBottomLeftRadius: 20,
   },
   cornerBottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 18,
+    borderBottomWidth: 5,
+    borderRightWidth: 5,
+    borderBottomRightRadius: 20,
   },
-  viewfinderShutterCircle: {
+  laserLine: {
     position: 'absolute',
-    bottom: 12,
-    alignSelf: 'center',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(6, 182, 212, 0.15)',
-    borderWidth: 2.5,
-    borderColor: '#38BDF8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#38BDF8',
+    top: 0,
+    left: 8,
+    right: 8,
+    height: 2.5,
+    backgroundColor: '#2DD4BF',
+    shadowColor: '#2DD4BF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.75,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  viewfinderShutterOuter: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewfinderShutterInner: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#00A3C4',
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 6,
   },
   standbyContent: {
     alignItems: 'center',
@@ -1964,7 +1928,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#0F231D',
+    backgroundColor: 'rgba(15, 35, 29, 0.8)',
     borderWidth: 1,
     borderColor: '#065F46',
     alignItems: 'center',
@@ -1977,13 +1941,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   standbySub: {
-    color: '#9CA3AF',
+    color: '#CBD5E1',
     fontSize: 11,
     textAlign: 'center',
     marginBottom: 14,
     lineHeight: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   retryCameraBtn: {
     flexDirection: 'row',
@@ -1999,99 +1969,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  scannerFooter: {
-    backgroundColor: '#0B1120',
-    borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 20,
+  floatingBottomSafeArea: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  floatingBottomContainer: {
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
     gap: 12,
   },
-  scannedCounterRow: {
+  floatingInstructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  floatingInstructionText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 6,
+  },
+  floatingScannedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  scannedPulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
+  floatingPulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#2DD4BF',
+    shadowColor: '#2DD4BF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  scannedCounterText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  scannedCountBold: {
+  floatingScannedText: {
     color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  bottomControlBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 10,
-    marginTop: 2,
-  },
-  primaryCaptureBtn: {
-    flex: 1,
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#00A3C4',
-    borderRadius: 32,
-    shadowColor: '#00A3C4',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    elevation: 10,
-  },
-  captureInnerCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryCaptureText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  cameraAuxBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 74,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#1E293B',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  cameraAuxBtnActive: {
-    backgroundColor: '#422006',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  cameraAuxText: {
-    color: '#E2E8F0',
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 6,
+  },
+  floatingScannedBold: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 
   // ── Profile Modal ──
