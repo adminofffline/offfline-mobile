@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
   ScrollView,
   Image,
 } from 'react-native';
@@ -22,6 +21,8 @@ import {
 import { PlantBottlingOrder } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { StatusBadge } from '../../components/StatusBadge';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
 
 interface PlantOrderDetailModalProps {
   visible: boolean;
@@ -29,6 +30,20 @@ interface PlantOrderDetailModalProps {
   onClose: () => void;
   onOpenScanner?: () => void;
 }
+
+const formatCampaignTitle = (title: string) => {
+  if (!title) return 'Commercial Bottling Order';
+  const clean = String(title).trim();
+  if (clean.startsWith('REGRESSION_CAMP_')) {
+    const parts = clean.split('_');
+    const num = parts[2] || '1';
+    return `Regression Campaign #${num}`;
+  }
+  if (clean.startsWith('CMP_')) {
+    return clean.replace(/^CMP_/, '').replace(/_/g, ' ');
+  }
+  return clean;
+};
 
 export const PlantOrderDetailModal: React.FC<PlantOrderDetailModalProps> = ({
   visible,
@@ -55,14 +70,19 @@ export const PlantOrderDetailModal: React.FC<PlantOrderDetailModalProps> = ({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle} numberOfLines={1}>
-                  {order.campaign}
+                  {formatCampaignTitle(order.campaign)}
                 </Text>
                 <Text style={styles.headerSubtitle}>{order.brand} &bull; {order.id}</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <NativePressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              haptic="selection"
+              hitSlop={8}
+            >
               <X size={20} color={COLORS.slate400} />
-            </TouchableOpacity>
+            </NativePressable>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
@@ -153,17 +173,16 @@ export const PlantOrderDetailModal: React.FC<PlantOrderDetailModalProps> = ({
           {/* Action Bottom Bar */}
           <View style={styles.modalFooter}>
             {onOpenScanner && order.status !== 'COMPLETED' && (
-              <TouchableOpacity
-                style={styles.scanBtn}
+              <AppleButton
+                title="Open QR Scanner for this Batch"
+                variant="plant"
+                size="md"
                 onPress={() => {
                   onClose();
                   onOpenScanner();
                 }}
-                activeOpacity={0.8}
-              >
-                <QrCode size={16} color={COLORS.white} />
-                <Text style={styles.scanBtnText}>Open QR Scanner for this Batch</Text>
-              </TouchableOpacity>
+                icon={<QrCode size={16} color={COLORS.white} />}
+              />
             )}
           </View>
         </View>

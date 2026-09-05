@@ -40,3 +40,5 @@ ios/.xcode.env.local
 # Temp
 .expo/
 *.log
+build-outputs/
+

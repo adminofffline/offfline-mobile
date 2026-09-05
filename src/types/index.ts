@@ -150,6 +150,9 @@ export interface DistributorScanRecord {
   scannedAt: string;
   bottlesCount: number;
   commission: number;
+  payout_amount?: number;
+  plantName?: string;
+  plant_name?: string;
   settlementStatus: 'PENDING_SETTLEMENT' | 'PROCESSING' | 'SETTLED';
   status?: string;
 }

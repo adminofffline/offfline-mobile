@@ -164,17 +164,20 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
+  const contextValue = React.useMemo(
+    () => ({
+      location,
+      permissionStatus,
+      isAcquiring,
+      error,
+      requestPermission,
+      getCurrentPosition,
+    }),
+    [location, permissionStatus, isAcquiring, error, requestPermission, getCurrentPosition]
+  );
+
   return (
-    <LocationContext.Provider
-      value={{
-        location,
-        permissionStatus,
-        isAcquiring,
-        error,
-        requestPermission,
-        getCurrentPosition,
-      }}
-    >
+    <LocationContext.Provider value={contextValue}>
       {children}
     </LocationContext.Provider>
   );

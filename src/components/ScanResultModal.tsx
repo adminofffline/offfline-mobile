@@ -225,14 +225,14 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
 
               <View style={styles.modeBadge}>
                 {isPlant ? (
-                  <Building2 size={12} color="#2DD4BF" />
+                  <Building2 size={12} color="#056B4A" />
                 ) : (
-                  <Truck size={12} color="#818CF8" />
+                  <Truck size={12} color="#D6B477" />
                 )}
                 <Text
                   style={[
                     styles.modeBadgeText,
-                    { color: isPlant ? '#2DD4BF' : '#A5B4FC' },
+                    { color: isPlant ? '#056B4A' : '#D6B477' },
                   ]}
                 >
                   {isPlant ? 'PLANT BOTTLING' : 'DISTRIBUTION'}
@@ -269,7 +269,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
             >
               <View style={styles.qrCodeBoxLeft}>
                 <View style={styles.qrIconWrapper}>
-                  <QrCode size={18} color="#2DD4BF" />
+                  <QrCode size={18} color="#D6B477" />
                 </View>
                 <View>
                   <Text style={styles.qrLabel}>SCANNED TOKEN / CAN ID</Text>
@@ -297,9 +297,9 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
                 <View style={styles.payoutLeft}>
                   <View style={styles.payoutIconCircle}>
                     {isPlant ? (
-                      <Droplets size={20} color="#059669" />
+                      <Droplets size={20} color="#056B4A" />
                     ) : (
-                      <TrendingUp size={20} color="#4338CA" />
+                      <TrendingUp size={20} color="#D6B477" />
                     )}
                   </View>
                   <View>
@@ -319,7 +319,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
               {data.campaignTitle && (
                 <View style={styles.gridRow}>
                   <View style={styles.gridIconCircle}>
-                    <Sparkles size={14} color="#38BDF8" />
+                    <Sparkles size={14} color="#D6B477" />
                   </View>
                   <View style={styles.gridInfo}>
                     <Text style={styles.gridLabel}>CAMPAIGN</Text>
@@ -334,7 +334,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
               {(data.locationName || data.plantName || data.distributorName) && (
                 <View style={styles.gridRow}>
                   <View style={styles.gridIconCircle}>
-                    <MapPin size={14} color="#F43F5E" />
+                    <MapPin size={14} color="#D6B477" />
                   </View>
                   <View style={styles.gridInfo}>
                     <Text style={styles.gridLabel}>OPERATIONAL LOCATION</Text>
@@ -351,7 +351,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
               {data.currentCount !== undefined && (
                 <View style={styles.gridRow}>
                   <View style={styles.gridIconCircle}>
-                    <ShieldCheck size={14} color="#10B981" />
+                    <ShieldCheck size={14} color="#056B4A" />
                   </View>
                   <View style={styles.gridInfo}>
                     <View style={styles.batchCountRow}>
@@ -371,7 +371,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
               {/* Timestamp & GPS Verification */}
               <View style={styles.gridRow}>
                 <View style={styles.gridIconCircle}>
-                  <Clock size={14} color="#F59E0B" />
+                  <Clock size={14} color="#D6B477" />
                 </View>
                 <View style={styles.gridInfo}>
                   <Text style={styles.gridLabel}>AUDIT TIMESTAMP</Text>
@@ -412,7 +412,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(2, 6, 23, 0.75)',
+    backgroundColor: 'rgba(10, 20, 26, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     width: Math.min(width - 32, 420),
     maxHeight: height * 0.84,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#0A141A',
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
@@ -442,10 +442,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   indicatorSuccess: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#056B4A',
   },
   indicatorWarning: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#D97706',
   },
   indicatorError: {
     backgroundColor: '#EF4444',

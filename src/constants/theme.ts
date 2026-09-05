@@ -1,47 +1,58 @@
 export const COLORS = {
-  // Brand & Neutrals
-  primary: '#0F172A',
-  primaryDark: '#0A0A0A',
+  // Brand & Neutrals (offfline.in Palette)
+  primary: '#111C24',           // Midnight Navy (Main Primary)
+  primaryDark: '#0A141A',       // Deep Obsidian / Dark Elements
   white: '#FFFFFF',
   black: '#000000',
-  background: '#F8FAFC',
+  background: '#FAF7F2',        // Soft Sandalwood / Clean Off-White
   cardBackground: '#FFFFFF',
-  darkCardBackground: '#121212',
+  darkCardBackground: '#192A34',// Deep Slate (Cards / Sections)
+
+  // offfline.in Signature Tokens
+  brandNavy: '#111C24',         // Midnight Navy
+  brandSand: '#D6B477',         // Warm Sand / Gold Accent
+  brandGold: '#D6B477',         // Signature Gold
+  brandIvory: '#F5F1E8',        // Soft Ivory
+  brandGray: '#A8B0B3',         // Cool Gray
+  brandSlate: '#192A34',        // Deep Slate
+  brandBorder: '#30434D',       // Slate Border
+  brandEmerald: '#056B4A',      // Luxury Emerald Green
 
   // Slate & Grayscale
-  slate50: '#F8FAFC',
-  slate100: '#F1F5F9',
+  slate50: '#FAF7F2',
+  slate100: '#F5F1E8',
   slate200: '#E2E8F0',
   slate300: '#CBD5E1',
   slate400: '#94A3B8',
   slate500: '#64748B',
   slate600: '#475569',
   slate700: '#334155',
-  slate800: '#1E293B',
-  slate900: '#0F172A',
-  slate950: '#020617',
+  slate800: '#192A34',
+  slate900: '#111C24',
+  slate950: '#0A141A',
 
-  // Plant Theme (Cyan / Teal)
-  plantAccent: '#0891B2',
-  plantAccentDark: '#0E7490',
-  plantBg: '#ECFEFF',
-  plantBorder: '#A5F3FC',
-  plantText: '#155E75',
+  // Plant Facility Theme (Luxury Emerald & Midnight Navy)
+  plantAccent: '#056B4A',
+  plantAccentDark: '#034D35',
+  plantBg: '#ECF7F2',
+  plantBorder: '#A7F3D0',
+  plantText: '#044E35',
 
-  // Distributor Theme (Indigo / Purple)
-  distributorAccent: '#4F46E5',
-  distributorAccentDark: '#4338CA',
-  distributorBg: '#EEF2FF',
-  distributorBorder: '#C7D2FE',
-  distributorText: '#3730A3',
+  // Distributor Hub Theme (Midnight Navy & Warm Sand)
+  distributorAccent: '#111C24',
+  distributorAccentDark: '#0A141A',
+  distributorBg: '#FAF7F2',
+  distributorBorder: '#E6D7C3',
+  distributorText: '#111C24',
+  distributorGold: '#D6B477',
 
-  // Status & Alerts
-  success: '#10B981',
-  successBg: '#ECFDF5',
+  // Status & Telemetry
+  success: '#056B4A',
+  successBg: '#ECF7F2',
   successBorder: '#A7F3D0',
-  successText: '#047857',
+  successText: '#044E35',
 
-  warning: '#F59E0B',
+  warning: '#D97706',
   warningBg: '#FFFBEB',
   warningBorder: '#FDE68A',
   warningText: '#B45309',
@@ -51,16 +62,16 @@ export const COLORS = {
   errorBorder: '#FECACA',
   errorText: '#B91C1C',
 
-  info: '#3B82F6',
-  infoBg: '#EFF6FF',
-  infoBorder: '#BFDBFE',
-  infoText: '#1D4ED8',
+  info: '#0284C7',
+  infoBg: '#F0F9FF',
+  infoBorder: '#BAE6FD',
+  infoText: '#0369A1',
   cyan: '#06B6D4',
 
-  // Border & Shadows
+  // Border & Dividers
   border: '#E2E8F0',
   borderLight: '#F1F5F9',
-  borderDark: '#334155',
+  borderDark: '#30434D',
   divider: '#F1F5F9',
 };
 

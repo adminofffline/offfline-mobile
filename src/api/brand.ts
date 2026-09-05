@@ -1,8 +1,13 @@
 import api from './client';
+import apiCache from './cache';
 
 export const brandApi = {
   getDashboard: () => api.get('/brand/dashboard'),
-  getCampaigns: () => api.get('/brand/campaign-list'),
+  getCampaigns: (forceRefresh = false) =>
+    apiCache.fetchWithCache('brand_campaigns', () => api.get('/brand/campaign-list'), {
+      ttlMs: 30000,
+      forceRefresh,
+    }),
   createCampaign: (data: any) => api.post('/brand/campaigns', data),
   getAnalytics: () => api.get('/brand/campaign-analytics'),
   getPricing: () => api.get('/brand/pricing'),

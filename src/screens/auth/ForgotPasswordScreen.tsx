@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
 import { ArrowLeft, Key, CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { authApi } from '../../api/auth';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
 
 interface ForgotPasswordScreenProps {
   navigation: any;
@@ -23,6 +23,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async () => {
+    if (isLoading) return;
     if (!phoneOrEmail.trim()) {
       setErrorMessage('Please enter your registered mobile number or email.');
       return;
@@ -44,14 +45,15 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <TouchableOpacity
+        <NativePressable
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
+          haptic="impactLight"
+          hitSlop={8}
         >
           <ArrowLeft size={18} color={COLORS.slate700} />
           <Text style={styles.backBtnText}>Back to Sign In</Text>
-        </TouchableOpacity>
+        </NativePressable>
 
         {isSubmitted ? (
           <View style={styles.card}>
@@ -62,12 +64,13 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
             <Text style={styles.desc}>
               If an account exists for {phoneOrEmail}, a verification code has been dispatched via WhatsApp / SMS.
             </Text>
-            <TouchableOpacity
-              style={styles.primaryBtn}
+            <AppleButton
+              title="Return to Login"
+              variant="primary"
+              size="lg"
               onPress={() => navigation.navigate('UnifiedLogin')}
-            >
-              <Text style={styles.primaryBtnText}>Return to Login</Text>
-            </TouchableOpacity>
+              style={{ width: '100%' }}
+            />
           </View>
         ) : (
           <View style={styles.card}>
@@ -98,18 +101,14 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
               />
             </View>
 
-            <TouchableOpacity
-              style={styles.primaryBtn}
+            <AppleButton
+              title="Send Reset Code"
+              variant="primary"
+              size="lg"
+              loading={isLoading}
               onPress={handleSubmit}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <Text style={styles.primaryBtnText}>Send Reset Code</Text>
-              )}
-            </TouchableOpacity>
+              style={{ width: '100%' }}
+            />
           </View>
         )}
       </View>

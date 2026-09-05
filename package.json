@@ -1,10 +1,16 @@
 {
-  "name": "WaterAds",
+  "name": "offfline-mobile",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
+    "build:apk": "bash scripts/build-apk.sh --release",
+    "build:apk:debug": "bash scripts/build-apk.sh --debug",
+    "build:aab": "cd android && ./gradlew bundleRelease",
+    "build:ios": "bash scripts/build-ios.sh --sim",
+    "build:ios:archive": "bash scripts/build-ios.sh --archive",
+    "build:all": "bash scripts/build-all.sh",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",

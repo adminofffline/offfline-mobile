@@ -377,7 +377,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "in.offfline.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WaterAds.app/WaterAds";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Offfline.app/Offfline";
 			};
 			name = Debug;
 		};
@@ -400,7 +400,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "in.offfline.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WaterAds.app/WaterAds";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Offfline.app/Offfline";
 			};
 			name = Release;
 		};
@@ -424,9 +424,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "in.offfline.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = in.offfline.app;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = in.offfline.app;
-				PRODUCT_NAME = WaterAds;
+				PRODUCT_NAME = Offfline;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -452,9 +452,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "in.offfline.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = in.offfline.app;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = in.offfline.app;
-				PRODUCT_NAME = WaterAds;
+				PRODUCT_NAME = Offfline;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};

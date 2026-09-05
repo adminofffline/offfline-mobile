@@ -1,7 +1,13 @@
 import api from './client';
+import apiCache from './cache';
 
 export const paymentsApi = {
-  getSettlements: (params?: any) => api.get("/payments/settlements", { params }),
+  getSettlements: (params?: any, forceRefresh = false) =>
+    apiCache.fetchWithCache(
+      `payments_settlements_${JSON.stringify(params || {})}`,
+      () => api.get('/payments/settlements', { params }),
+      { ttlMs: 30000, forceRefresh }
+    ),
   getPlantSettlements: (params?: any) => api.get("/payments/settlements/plant", { params }),
   getDistributorSettlements: (params?: any) => api.get("/payments/settlements/distributor", { params }),
   getPressSettlements: (params?: any) => api.get("/payments/settlements/press", { params }),

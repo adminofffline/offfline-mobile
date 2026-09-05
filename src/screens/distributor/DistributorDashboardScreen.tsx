@@ -14,6 +14,7 @@ import {
   Platform,
   StatusBar,
   Animated,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   FileText,
@@ -36,79 +37,364 @@ import {
   SwitchCamera,
   Flashlight,
   FlashlightOff,
+  ChevronDown,
+  Check,
+  Building2,
+  Mail,
+  Phone,
+  FileCheck,
+  CreditCard,
+  Lock,
+  AlertCircle,
+  Gauge,
 } from 'lucide-react-native';
-import {
-  Camera as VisionCamera,
-  useCameraDevice,
-  useCameraPermission,
-  useCodeScanner,
-} from 'react-native-vision-camera';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { distributorApi } from '../../api/distributor';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
+import { apiCache } from '../../api/cache';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
+import { PoppedBottomSheetModal } from '../../components/PoppedBottomSheetModal';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
+import { DashboardQRScannerModal } from '../../components/DashboardQRScannerModal';
+import { OffflineBrandWordmark } from '../../components/common/OffflineBrandWordmark';
+import { AppleCelebrationToast, ToastData } from '../../components/common/AppleCelebrationToast';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(64, Math.floor((width - 48) / 4));
 
-// ── Custom SVG Icons for Circular Metric Badges (Pixel-matched to design) ──
-const DocSheetIcon = ({ size = 25, color = '#0284C7' }: { size?: number; color?: string }) => (
+// ── Custom Pixel-Perfect SVG Icons (Apple Minimalist Redesign) ──
+const MapPinIcon = ({ size = 20, color = '#2563EB' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
-      d="M5 4C5 2.89543 5.89543 2 7 2H14.5L19 6.5V20C19 21.1046 18.1046 22 17 22H7C5.89543 22 5 21.1046 5 20V4Z"
-      fill={color}
-    />
-    <Path d="M14 2V6C14 6.55228 14.4477 7 15 7H19" fill={color} fillOpacity={0.65} />
-    <Rect x="8" y="10" width="8" height="2" rx="1" fill="#FFFFFF" />
-    <Rect x="8" y="13.5" width="8" height="2" rx="1" fill="#FFFFFF" />
-    <Rect x="8" y="17" width="5" height="2" rx="1" fill="#FFFFFF" />
-  </Svg>
-);
-
-const BottleBadgeIcon = ({ size = 26, color = '#059669' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect x="9.5" y="2" width="5" height="2" rx="0.75" fill={color} />
-    <Path
-      d="M10 4V7L8 10V20C8 21.1 8.9 22 10 22H14C15.1 22 16 21.1 16 20V10L14 7V4H10Z"
-      fill={color}
-    />
-    <Rect x="9.5" y="12" width="5" height="4.5" rx="1" fill="#FFFFFF" fillOpacity={0.95} />
-  </Svg>
-);
-
-const TruckBadgeIcon = ({ size = 26, color = '#F97316' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M2 5C2 4.44772 2.44772 4 3 4H14C14.5523 4 15 4.44772 15 5V14H2V5Z"
-      fill={color}
-    />
-    <Path
-      d="M15 7.5H18.5C18.8978 7.5 19.2794 7.65804 19.5607 7.93934L22.0607 10.4393C22.342 10.7206 22.5 11.1022 22.5 11.5V15C22.5 15.5523 22.0523 16 21.5 16H20.4C20.08 14.85 19.04 14 17.8 14C16.56 14 15.52 14.85 15.2 16H8.8C8.48 14.85 7.44 14 6.2 14C4.96 14 3.92 14.85 3.6 16H2.5C1.94772 16 1.5 15.5523 1.5 15V13H15V7.5Z"
-      fill={color}
-    />
-    <Circle cx="6.2" cy="16.5" r="2.3" fill={color} />
-    <Circle cx="17.8" cy="16.5" r="2.3" fill={color} />
-    <Circle cx="6.2" cy="16.5" r="0.9" fill="#FFFFFF" />
-    <Circle cx="17.8" cy="16.5" r="0.9" fill="#FFFFFF" />
-    <Path d="M16 9H18L20 11.5H16V9Z" fill="#FFFFFF" fillOpacity={0.9} />
-  </Svg>
-);
-
-const RupeeBadgeIcon = ({ size = 24, color = '#7C3AED' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M6 4.5H18M6 8.5H18M6 4.5V12.5C6 14.2 7.3 15.5 9.5 15.5H12L17.5 21.5M10 12.5H14C15.6569 12.5 17 11.1569 17 9.5C17 7.84315 15.6569 6.5 14 6.5H6"
+      d="M12 2C8.13401 2 5 5.13401 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13401 15.866 2 12 2Z"
       stroke={color}
-      strokeWidth="2.6"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle cx="12" cy="9" r="2.8" stroke={color} strokeWidth="2.2" />
+  </Svg>
+);
+
+const DocSheetIcon = ({ size = 20, color = '#2563EB' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M5 4C5 2.89543 5.89543 2 7 2H13.8L19 7.2V20C19 21.1046 18.1046 22 17 22H7C5.89543 22 5 21.1046 5 20V4Z"
+      fill={color}
+    />
+    <Path
+      d="M13.8 2V6.2C13.8 6.75228 14.2477 7.2 14.8 7.2H19L13.8 2Z"
+      fill="#FFFFFF"
+      fillOpacity={0.35}
+    />
+    <Rect x="8" y="10.5" width="8" height="1.8" rx="0.9" fill="#FFFFFF" />
+    <Rect x="8" y="14" width="8" height="1.8" rx="0.9" fill="#FFFFFF" />
+    <Rect x="8" y="17.5" width="5" height="1.8" rx="0.9" fill="#FFFFFF" />
+  </Svg>
+);
+
+const BottleBadgeIcon = ({ size = 20, color = '#0891B2' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="10" y="2" width="4" height="2" rx="0.8" fill={color} />
+    <Path d="M10 4H14V6.2H10V4Z" fill={color} />
+    <Path
+      d="M8.2 7.2C7.5 7.9 7 9.1 7 10.5V19C7 20.6569 8.34315 22 10 22H14C15.6569 22 17 20.6569 17 19V10.5C17 9.1 16.5 7.9 15.8 7.2C15.2 6.6 14.2 6.2 14.2 6.2H9.8C9.8 6.2 8.8 6.6 8.2 7.2Z"
+      fill={color}
+    />
+    <Rect x="9" y="11" width="6" height="6.5" rx="1.5" fill="#FFFFFF" fillOpacity={0.92} />
+    <Path
+      d="M12 12.6C12 12.6 10.6 14.1 10.6 15C10.6 15.77 11.23 16.4 12 16.4C12.77 16.4 13.4 15.77 13.4 15C13.4 14.1 12 12.6 12 12.6Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+const TruckBadgeIcon = ({ size = 20, color = '#16A34A' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M2 5.5C2 4.67157 2.67157 4 3.5 4H14C14.5523 4 15 4.44772 15 5V15H3.5C2.67157 15 2 14.3284 2 13.5V5.5Z"
+      fill={color}
+    />
+    <Path
+      d="M15 7.5H18.2C18.65 7.5 19.08 7.7 19.38 8.04L21.78 10.74C21.92 10.9 22 11.11 22 11.33V14C22 14.5523 21.5523 15 21 15H15V7.5Z"
+      fill={color}
+    />
+    <Path
+      d="M16.5 9H18.2C18.35 9 18.5 9.08 18.6 9.2L20.2 11.2C20.27 11.28 20.3 11.39 20.3 11.5V11.8H16.5V9Z"
+      fill="#FFFFFF"
+    />
+    <Circle cx="6.5" cy="16.5" r="2.6" fill="#FFFFFF" stroke={color} strokeWidth="1.8" />
+    <Circle cx="6.5" cy="16.5" r="1.1" fill={color} />
+    <Circle cx="17.5" cy="16.5" r="2.6" fill="#FFFFFF" stroke={color} strokeWidth="1.8" />
+    <Circle cx="17.5" cy="16.5" r="1.1" fill={color} />
+  </Svg>
+);
+
+const RupeeBadgeIcon = ({ size = 20, color = '#7C3AED' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M6 3H18M6 8H18M6 13L15 22M6 13H10C12.7614 13 15 10.7614 15 8C15 5.23858 12.7614 3 10 3"
+      stroke={color}
+      strokeWidth="2.4"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
   </Svg>
+);
+
+// ── Apple Shimmer Skeleton Block ──
+const ShimmerBlock: React.FC<{ style?: any; borderRadius?: number }> = ({
+  style,
+  borderRadius = 8,
+}) => {
+  const shimmerAnim = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 0.85,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0.35,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmerAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: '#E2E8F0',
+          borderRadius,
+          opacity: shimmerAnim,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+interface AnimatedGlassMetricTileProps {
+  icon: React.ReactNode;
+  iconBgColor: string;
+  unitText: string;
+  unitTextColor?: string;
+  unitBgColor?: string;
+  value: string | number;
+  label: string;
+  delay?: number;
+  loading?: boolean;
+  onPress?: () => void;
+}
+
+const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> = ({
+  icon,
+  iconBgColor,
+  unitText,
+  unitTextColor = '#64748B',
+  unitBgColor = 'rgba(241, 245, 249, 0.9)',
+  value,
+  label,
+  delay = 0,
+  loading = false,
+  onPress,
+}) => {
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(12)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 340,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [delay]);
+
+  // Pulse effect when number value changes
+  useEffect(() => {
+    if (!loading) {
+      pulseAnim.setValue(1.06);
+      Animated.spring(pulseAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 120,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [value, loading]);
+
+  const handlePressIn = () => {
+    if (loading) return;
+    Animated.timing(pressScale, {
+      toValue: 0.96,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (loading) return;
+    Animated.spring(pressScale, {
+      toValue: 1,
+      friction: 6,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePress = () => {
+    if (loading) return;
+    try {
+      ReactNativeHapticFeedback.trigger('selection', {
+        enableVibrateFallback: true,
+      });
+    } catch (e) {}
+    if (onPress) onPress();
+  };
+
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={handlePress}
+    >
+      <Animated.View
+        style={[
+          styles.glassMetricTile,
+          {
+            opacity: fadeAnim,
+            transform: [
+              { translateY: slideAnim },
+              { scale: pressScale },
+            ],
+          },
+        ]}
+      >
+        {/* Top Header Row (Icon + Unit Pill) */}
+        <View style={styles.tileHeaderRow}>
+          {loading ? (
+            <>
+              <ShimmerBlock style={{ width: 32, height: 32 }} borderRadius={10} />
+              <ShimmerBlock style={{ width: 44, height: 20 }} borderRadius={7} />
+            </>
+          ) : (
+            <>
+              <View style={[styles.tileIconSquircle, { backgroundColor: iconBgColor }]}>
+                {icon}
+              </View>
+              <View style={[styles.tileUnitPill, { backgroundColor: unitBgColor }]}>
+                <Text style={[styles.tileUnitText, { color: unitTextColor }]}>
+                  {unitText}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Big Apple Bold Counter */}
+        <View style={styles.tileCounterWrap}>
+          {loading ? (
+            <ShimmerBlock style={{ width: 70, height: 22 }} borderRadius={5} />
+          ) : (
+            <Animated.Text
+              style={[
+                styles.tileCounter,
+                { transform: [{ scale: pulseAnim }] },
+                String(value).length > 7 && { fontSize: 16 },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {value}
+            </Animated.Text>
+          )}
+        </View>
+
+        {/* Label Row */}
+        <View style={styles.tileLabelWrap}>
+          {loading ? (
+            <ShimmerBlock style={{ width: '85%', height: 13 }} borderRadius={4} />
+          ) : (
+            <Text style={styles.tileLabel} numberOfLines={2}>
+              {label}
+            </Text>
+          )}
+        </View>
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+};
+
+const AnimatedGlassMetricTile = React.memo(AnimatedGlassMetricTileComponent);
+
+// ── Apple Scan Card Skeleton Placeholder ──
+const ScanCardSkeleton = () => (
+  <View style={styles.scanCardSkeleton}>
+    <View style={styles.scanCardLeft}>
+      <View style={{ flex: 1, gap: 5 }}>
+        <ShimmerBlock style={{ width: '55%', height: 15 }} borderRadius={5} />
+        <ShimmerBlock style={{ width: '70%', height: 11 }} borderRadius={3} />
+      </View>
+    </View>
+    <View style={{ alignItems: 'flex-end', gap: 5 }}>
+      <ShimmerBlock style={{ width: 60, height: 20 }} borderRadius={10} />
+      <ShimmerBlock style={{ width: 40, height: 10 }} borderRadius={3} />
+    </View>
+  </View>
+);
+
+const formatCampaignTitle = (title: string) => {
+  if (!title) return 'Commercial Delivery Batch';
+  const clean = String(title).trim();
+  if (clean.startsWith('REGRESSION_CAMP_')) {
+    const parts = clean.split('_');
+    const num = parts[2] || '1';
+    return `Regression Campaign #${num}`;
+  }
+  if (clean.startsWith('CMP_') || clean.startsWith('CAMP_')) {
+    return clean.replace(/^(CMP_|CAMP_)/, '').replace(/_/g, ' ');
+  }
+  return clean;
+};
+
+// ── Apple Settlement Card Skeleton Placeholder ──
+const SettlementCardSkeleton = () => (
+  <View style={styles.settlementCardSkeleton}>
+    <View style={{ flex: 1, gap: 5, marginRight: 10 }}>
+      <ShimmerBlock style={{ width: '60%', height: 14 }} borderRadius={4} />
+      <ShimmerBlock style={{ width: '38%', height: 11 }} borderRadius={3} />
+    </View>
+    <View style={{ alignItems: 'flex-end', gap: 5 }}>
+      <ShimmerBlock style={{ width: 60, height: 14 }} borderRadius={4} />
+      <ShimmerBlock style={{ width: 48, height: 18 }} borderRadius={9} />
+    </View>
+  </View>
 );
 
 interface ScanRecord {
@@ -131,22 +417,109 @@ interface SettlementRecord {
   settlementStatus: 'SETTLED' | 'PENDING';
 }
 
+const DistributorScanCardItem = React.memo(({
+  scan,
+  onSelect,
+}: {
+  scan: ScanRecord;
+  onSelect: (scan: ScanRecord) => void;
+}) => {
+  return (
+    <NativePressable
+      style={styles.scanCard}
+      onPress={() => onSelect(scan)}
+      hapticType="selection"
+      scaleActive={0.98}
+    >
+      <View style={styles.scanCardLeft}>
+        <View style={styles.scanCardTextWrap}>
+          <Text style={styles.scanCanId}>{scan.can_id}</Text>
+          <Text style={styles.scanCampaignSub} numberOfLines={1}>
+            {scan.campaign_title} • {scan.location_name}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.scanCardRight}>
+        <View style={styles.appleVerifiedPill}>
+          <View style={styles.verifiedDot} />
+          <Text style={styles.appleVerifiedText}>Verified</Text>
+        </View>
+        <Text style={styles.scanTime}>{scan.deliveryTime}</Text>
+      </View>
+    </NativePressable>
+  );
+});
+
+const DistributorSettlementCardItem = React.memo(({ record }: { record: SettlementRecord }) => {
+  const isSettled = record.settlementStatus === 'SETTLED';
+  const displayTitle = formatCampaignTitle(record.campaignTitle);
+  const formattedAmount = `+₹${record.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formattedBottles = `${record.bottlesCount.toLocaleString('en-IN')} cans`;
+
+  return (
+    <View style={styles.settlementCard}>
+      <View style={styles.settlementCardMiddle}>
+        <Text style={styles.settlementCardTitle} numberOfLines={1}>
+          {displayTitle}
+        </Text>
+        <Text style={styles.settlementCardSub} numberOfLines={1}>
+          {record.brandName || 'Brand Partner'} • {formattedBottles}
+        </Text>
+      </View>
+
+      <View style={styles.settlementCardRight}>
+        <Text style={styles.settlementCardAmount}>{formattedAmount}</Text>
+        <View
+          style={[
+            styles.appleSettleBadge,
+            isSettled ? styles.appleSettleBadgeSettled : styles.appleSettleBadgePending,
+          ]}
+        >
+          <View
+            style={[
+              styles.settleDot,
+              isSettled ? styles.settleDotSettled : styles.settleDotPending,
+            ]}
+          />
+          <Text
+            style={[
+              styles.appleSettleBadgeText,
+              isSettled ? styles.appleSettleBadgeTextSettled : styles.appleSettleBadgeTextPending,
+            ]}
+          >
+            {isSettled ? 'Settled' : 'Pending'}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+});
+
 export function DistributorDashboardScreen({ navigation }: any) {
   const { user, signOut, refreshProfile } = useAuth();
   const currentUser = user;
 
   const [activeTab, setActiveTab] = useState<'scan-reports' | 'settlement-report'>('scan-reports');
 
+  const handleTabSelect = useCallback((tabKey: string) => {
+    setActiveTab(tabKey as any);
+  }, []);
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastData, setToastData] = useState<ToastData | string | null>(null);
 
   // Data
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [ledgerRecords, setLedgerRecords] = useState<SettlementRecord[]>([]);
+
+  // Lazy Loading / Pagination (10 items per page with infinite scroll)
+  const PAGE_SIZE = 10;
+  const [scansLimit, setScansLimit] = useState(PAGE_SIZE);
+  const [settlementsLimit, setSettlementsLimit] = useState(PAGE_SIZE);
 
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
@@ -155,20 +528,25 @@ export function DistributorDashboardScreen({ navigation }: any) {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ScanRecord | null>(null);
+  const activeRecordRef = useRef<ScanRecord | null>(null);
+  if (selectedRecord) {
+    activeRecordRef.current = selectedRecord;
+  }
+  const currentRecord = selectedRecord || activeRecordRef.current;
 
   // Profile Form States
   const [profileOrgName, setProfileOrgName] = useState(
-    currentUser?.companyName || currentUser?.fullName || 'South India Beverage Logistics'
+    currentUser?.companyName || currentUser?.fullName || 'Distributor Facility'
   );
-  const [profileEmail, setProfileEmail] = useState(currentUser?.email || 'distributor@offfline.in');
-  const [profilePhone, setProfilePhone] = useState(currentUser?.phone || '+91 98401 23456');
-  const [profileGstin, setProfileGstin] = useState('33AAAAA0000A1Z5');
-  const [profileLicenseId, setProfileLicenseId] = useState('FSSAI-DIST-90214');
-  const [profileBankName, setProfileBankName] = useState('HDFC Bank');
-  const [profileAccountNo, setProfileAccountNo] = useState('50100492819201');
-  const [profileIfsc, setProfileIfsc] = useState('HDFC0000004');
-  const [profileDeliveryCapacity, setProfileDeliveryCapacity] = useState('15,000 cans/day');
-  const [profileAddress, setProfileAddress] = useState('Anna Salai, Mount Road, Chennai');
+  const [profileEmail, setProfileEmail] = useState(currentUser?.email || '');
+  const [profilePhone, setProfilePhone] = useState(currentUser?.phone || '');
+  const [profileGstin, setProfileGstin] = useState(currentUser?.distributor_profile?.gstin || '');
+  const [profileLicenseId, setProfileLicenseId] = useState(currentUser?.distributor_profile?.license_id || '');
+  const [profileBankName, setProfileBankName] = useState(currentUser?.distributor_profile?.bank_name || '');
+  const [profileAccountNo, setProfileAccountNo] = useState(currentUser?.distributor_profile?.account_no || '');
+  const [profileIfsc, setProfileIfsc] = useState(currentUser?.distributor_profile?.ifsc_code || '');
+  const [profileDeliveryCapacity, setProfileDeliveryCapacity] = useState(currentUser?.distributor_profile?.delivery_capacity || '15,000 cans/day');
+  const [profileAddress, setProfileAddress] = useState(currentUser?.distributor_profile?.warehouse_address || currentUser?.address || 'Chennai Facility');
 
   // Password Form States
   const [oldPassword, setOldPassword] = useState('');
@@ -178,19 +556,31 @@ export function DistributorDashboardScreen({ navigation }: any) {
   // Scanner Simulator Count
   const [scannerCount, setScannerCount] = useState(0);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const triggerToast = (
+    msg: string | ToastData,
+    subtitle?: string,
+    options?: { highlight?: string; isCelebration?: boolean }
+  ) => {
+    if (typeof msg === 'string') {
+      setToastData({
+        title: msg,
+        subtitle,
+        highlight: options?.highlight,
+        isCelebration: options?.isCelebration ?? (msg.includes('recorded') || msg.includes('🎉') || msg.includes('+')),
+      });
+    } else {
+      setToastData(msg);
+    }
   };
 
-  // ── Load Real Production Data for Distributor ──
-  const loadProductionData = useCallback(async () => {
+  // ── Load Real Production Data for Distributor with 0ms Cache & SWR ──
+  const loadProductionData = useCallback(async (forceRefresh = false) => {
     try {
       const [distRes, publicRes, settRes, profileRes] = await Promise.all([
-        distributorApi.getScans({ limit: 100 }).catch(() => null),
-        api.get('/public/scan-audit').catch(() => null),
-        paymentsApi.getSettlements().catch(() => null),
-        authApi.me().catch(() => null),
+        distributorApi.getScans({ limit: 100 }, forceRefresh).catch(() => null),
+        apiCache.fetchWithCache('public_scan_audit', () => api.get('/public/scan-audit'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
+        paymentsApi.getSettlements({}, forceRefresh).catch(() => null),
+        apiCache.fetchWithCache('distributor_auth_me', () => authApi.me(), { forceRefresh, ttlMs: 60000 }).catch(() => null),
       ]);
 
       if (profileRes?.data?.user) {
@@ -283,66 +673,14 @@ export function DistributorDashboardScreen({ navigation }: any) {
     loadProductionData();
   }, [loadProductionData]);
 
-  // ── Real Camera & Vision Code Scanner ──
-  const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
-  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
-  const [torch, setTorch] = useState(false);
-  const cameraDevice = useCameraDevice(cameraPosition);
-  const isProcessingScanRef = useRef(false);
-  const laserAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (showQrModal) {
-      const anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(laserAnim, {
-            toValue: 1,
-            duration: 1800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(laserAnim, {
-            toValue: 0,
-            duration: 1800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      anim.start();
-      return () => anim.stop();
-    }
-  }, [showQrModal, laserAnim]);
-
-  const handleSwitchCamera = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('selection', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-    setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
-    setTorch(false);
-  }, []);
-
-  useEffect(() => {
-    if (showQrModal && !hasCameraPermission) {
-      requestCameraPermission();
-    }
-  }, [showQrModal, hasCameraPermission]);
-
-  const handleRealQrScanned = useCallback(async (scannedCode: string) => {
-    if (isProcessingScanRef.current) return;
-    isProcessingScanRef.current = true;
-
-    ReactNativeHapticFeedback.trigger('impactHeavy', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-
+  // ── Real Camera & Vision Code Burst Scanner Handlers ──
+  const handleRealQrScanned = useCallback((scannedCode: string) => {
     const cleanCode = String(scannedCode || '').trim();
-    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newScan: ScanRecord = {
-      id: `SCN_${Date.now()}`,
-      can_id: cleanCode,
+      id: `SCN_${Date.now()}_${Math.random()}`,
+      can_id: cleanCode.startsWith('CAN-') ? cleanCode : `CAN-${cleanCode.slice(-6).toUpperCase()}`,
       campaign_title: 'Live Delivery Batch',
       location_name: 'Chennai Central Hub',
       deliveryTime: formattedDeliveryTime,
@@ -352,91 +690,28 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
     setScans((prev) => [newScan, ...prev]);
     setScannerCount((c) => c + 1);
-    triggerToast(`✓ Verified delivery QR [${cleanCode.slice(-8)}] recorded!`);
 
-    // Instant Return Output Popup
-    setScanResultData({
-      status: 'SUCCESS',
-      title: '✓ Delivery QR Verified',
-      message: 'Retail can delivery verified & settlement ledger updated.',
-      qrId: cleanCode,
-      canId: cleanCode.startsWith('CAN-') ? cleanCode : `CAN-${cleanCode.slice(-6).toUpperCase()}`,
-      campaignTitle: 'Live Delivery Batch',
-      distributorName: profileOrgName || 'South India Beverage Logistics',
-      locationName: 'Chennai Central Hub',
-      payoutAmount: 0.50,
-      currentCount: scans.length + 1,
-      allocatedQuantity: 4000,
-      scanType: 'DISTRIBUTOR',
-      timestamp: nowTimeStr,
-    });
-
-    try {
-      const res = await distributorApi.scanQr({
-        qr_id: cleanCode,
-        campaign_id: 'CMP_LIVE_DIST_1',
-        latitude: 13.0827,
-        longitude: 80.2707,
-        accuracy: 5.0,
-      });
-
-      if (res?.data) {
-        if (res.data.already_scanned || res.data.is_rescan) {
-          setScanResultData((prev) => (prev ? {
-            ...prev,
-            status: 'DUPLICATE',
-            title: '⚠️ Already Scanned',
-            message: res.data.message || 'This QR has already been delivered.',
-          } : null));
-        } else {
-          setScanResultData((prev) => (prev ? {
-            ...prev,
-            status: 'SUCCESS',
-            campaignTitle: res.data.campaign_title || res.data.campaign?.title || prev.campaignTitle,
-            locationName: res.data.location_name || prev.locationName,
-            distributorName: res.data.distributor_name || prev.distributorName,
-            currentCount: res.data.current_count ?? prev.currentCount,
-            payoutAmount: res.data.rate_per_unit || res.data.gross_amount || prev.payoutAmount,
-            rawResponse: res.data,
-          } : null));
-        }
-      }
-    } catch (err: any) {
-      if (err.response?.status === 409 || err.response?.data?.already_scanned) {
-        setScanResultData((prev) => (prev ? {
-          ...prev,
-          status: 'DUPLICATE',
-          title: '⚠️ Already Scanned',
-          message: err.response?.data?.message || 'This QR has already been delivered.',
-        } : null));
-      }
-    }
-  }, [profileOrgName, scans.length]);
-
-  const handleScanNext = useCallback(() => {
-    setScanResultData(null);
-    setTimeout(() => {
-      isProcessingScanRef.current = false;
-    }, 250);
+    distributorApi.scanQr({
+      qr_id: cleanCode,
+      campaign_id: 'CMP_LIVE_DIST_1',
+      latitude: 13.0827,
+      longitude: 80.2707,
+      accuracy: 5.0,
+    }).catch(() => null);
   }, []);
 
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
-    onCodeScanned: (codes) => {
-      const firstVal = codes[0]?.value;
-      if (firstVal && !isProcessingScanRef.current && !scanResultData) {
-        handleRealQrScanned(firstVal);
-      }
-    },
-  });
+  const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
+    setShowQrModal(false);
+    if (totalScannedInSession > 0) {
+      triggerToast(`🎉 Batch of ${totalScannedInSession} deliveries recorded & verified!`);
+      loadProductionData().catch(() => {});
+    }
+  }, [loadProductionData]);
 
   // ── Handle Real QR Scan Submission on Production ──
-  const handlePerformLiveScan = async () => {
-    ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
-
+  const handlePerformLiveScan = useCallback(() => {
     const generatedCanId = `CAN-600001-${Math.floor(Math.random() * 89999 + 10000)}`;
     const generatedQrId = `WA-DST-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 899 + 100)}`;
-    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newScan: ScanRecord = {
@@ -451,23 +726,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
     setScans((prev) => [newScan, ...prev]);
     setScannerCount((c) => c + 1);
-    triggerToast(`✓ Verified delivery of [${generatedCanId}] recorded!`);
-
-    setScanResultData({
-      status: 'SUCCESS',
-      title: '✓ Delivery QR Verified',
-      message: 'Retail can delivery verified & settlement ledger updated.',
-      qrId: generatedQrId,
-      canId: generatedCanId,
-      campaignTitle: 'Live Delivery Batch',
-      distributorName: profileOrgName || 'South India Beverage Logistics',
-      locationName: 'Chennai Central Hub',
-      payoutAmount: 0.50,
-      currentCount: scans.length + 1,
-      allocatedQuantity: 4000,
-      scanType: 'DISTRIBUTOR',
-      timestamp: nowTimeStr,
-    });
 
     distributorApi.scanQr({
       qr_id: generatedQrId,
@@ -476,7 +734,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
       longitude: 80.2707,
       accuracy: 5.0,
     }).catch(() => null);
-  };
+  }, []);
 
   // ── Handle Save Profile to Production Server ──
   const handleSaveProfile = async () => {
@@ -532,37 +790,75 @@ export function DistributorDashboardScreen({ navigation }: any) {
     });
   }, [scans, searchQuery, activeFilter]);
 
+  // Reset pagination on filter or search change
+  useEffect(() => {
+    setScansLimit(PAGE_SIZE);
+  }, [searchQuery, activeFilter]);
+
+  // Lazy Loaded / Paginated Slices
+  const displayedScans = useMemo(() => {
+    return filteredRecords.slice(0, scansLimit);
+  }, [filteredRecords, scansLimit]);
+
+  const displayedSettlements = useMemo(() => {
+    return ledgerRecords.slice(0, settlementsLimit);
+  }, [ledgerRecords, settlementsLimit]);
+
+  // Smooth Infinite Scroll Lazy Loading
+  const handleScroll = useCallback(
+    (event: any) => {
+      const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+      const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 150;
+      if (isCloseToBottom) {
+        if (activeTab === 'scan-reports') {
+          setScansLimit((prev) => (prev < filteredRecords.length ? Math.min(prev + PAGE_SIZE, filteredRecords.length) : prev));
+        } else if (activeTab === 'settlement-report') {
+          setSettlementsLimit((prev) => (prev < ledgerRecords.length ? Math.min(prev + PAGE_SIZE, ledgerRecords.length) : prev));
+        }
+      }
+    },
+    [activeTab, filteredRecords.length, ledgerRecords.length]
+  );
+
   const todayLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const uniqueCampaignsCount = useMemo(() => {
-    return Math.max(1, new Set(scans.map((s) => s.campaign_title)).size);
+    return new Set(scans.map((s) => s.campaign_title)).size;
+  }, [scans]);
+
+  const uniqueRoutesCount = useMemo(() => {
+    return new Set(scans.map((s) => s.location_name)).size;
   }, [scans]);
 
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* TOAST ALERT */}
-      {toastMessage && (
-        <View style={styles.toastContainer}>
-          <CheckCircle2 color="#34D399" size={16} />
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </View>
-      )}
+      {/* ── 0. FLOATING APPLE CELEBRATION TOAST ── */}
+      <AppleCelebrationToast
+        data={toastData}
+        onDismiss={() => setToastData(null)}
+      />
 
-      {/* ── 1. HEADER (Indigo Theme) ── */}
+      {/* ── 1. FLOATING TOP BAR (Apple Pill Header) ── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {profileOrgName}
-        </Text>
-        <TouchableOpacity
-          style={styles.avatarCircle}
+        <View style={styles.headerLeftCol}>
+          <OffflineBrandWordmark
+            pageTitle={activeTab === 'scan-reports' ? 'Distributor Dashboard' : 'Distributor Settlements'}
+            size="lg"
+          />
+        </View>
+        <NativePressable
+          style={styles.avatarRingWrap}
           onPress={() => setShowUserMenu(!showUserMenu)}
-          activeOpacity={0.8}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          hapticType="selection"
+          scaleActive={0.92}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={styles.avatarText}>DI</Text>
-        </TouchableOpacity>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>DI</Text>
+          </View>
+        </NativePressable>
       </View>
 
       {/* ── 2. SCROLLABLE BODY ── */}
@@ -570,166 +866,207 @@ export function DistributorDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              loadProductionData();
+              loadProductionData(true);
             }}
           />
         }
       >
-        {activeTab === 'scan-reports' ? (
-          <>
-            {/* ── 4 CIRCULAR STAT BADGES (Pixel-Matched to Design Attachment) ── */}
-            <View style={styles.metricsRowWrapper}>
-              {/* 1. Active Batches */}
-              <View style={styles.metricCircleCol}>
-                <View style={[styles.circleBadge, styles.circleBadgeBlue]}>
-                  <DocSheetIcon size={24} color="#0284C7" />
-                </View>
-                <Text style={styles.metricStatValue}>{uniqueCampaignsCount}</Text>
-                <Text style={styles.metricStatLabel}>Active Orders</Text>
-              </View>
+        {/* ── TAB 1: SCAN REPORTS (Persistent layout container for 0ms instant tab switching) ── */}
+        <View style={{ display: activeTab === 'scan-reports' ? 'flex' : 'none' }}>
+          {/* ── UNIFIED MASTER METRICS CARD (Apple Liquid Frosted Glass) ── */}
+          <View style={styles.unifiedGlassMasterCard}>
+            <View style={styles.glassCardSpecularShine} />
+
+            {/* Row 1 */}
+            <View style={styles.metricsGridRow}>
+              {/* 1. Active Orders */}
+              <AnimatedGlassMetricTile
+                icon={<DocSheetIcon size={17} color="#2563EB" />}
+                iconBgColor="#EFF6FF"
+                unitText="Batches"
+                unitTextColor="#64748B"
+                value={uniqueCampaignsCount}
+                label="Active Orders"
+                delay={0}
+                loading={loading}
+              />
 
               {/* 2. Delivered Bottles */}
-              <View style={styles.metricCircleCol}>
-                <View style={[styles.circleBadge, styles.circleBadgeGreen]}>
-                  <BottleBadgeIcon size={26} color="#059669" />
-                </View>
-                <Text style={styles.metricStatValue}>
-                  {scans.length.toLocaleString('en-IN')}
-                </Text>
-                <Text style={styles.metricStatLabel}>Delivered</Text>
-              </View>
-
-              {/* 3. Active Routes */}
-              <View style={styles.metricCircleCol}>
-                <View style={[styles.circleBadge, styles.circleBadgeOrange]}>
-                  <TruckBadgeIcon size={25} color="#F97316" />
-                </View>
-                <Text style={styles.metricStatValue}>4</Text>
-                <Text style={styles.metricStatLabel}>Active Routes</Text>
-              </View>
-
-              {/* 4. Commission */}
-              <View style={styles.metricCircleCol}>
-                <View style={[styles.circleBadge, styles.circleBadgePurple]}>
-                  <RupeeBadgeIcon size={24} color="#7C3AED" />
-                </View>
-                <Text style={styles.metricStatValue}>
-                  ₹{(scans.length * 0.50).toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-                </Text>
-                <Text style={styles.metricStatLabel}>Commission</Text>
-                <Text style={styles.metricStatSub}>@ ₹0.50/can</Text>
-              </View>
-            </View>
-
-            {/* ── SEARCH BAR (Pill Rounded Search Bar Matching Attachment) ── */}
-            <View style={styles.searchContainer}>
-              <Search color="#94A3B8" size={19} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search campaign, brand, or location..."
-                placeholderTextColor="#94A3B8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCorrect={false}
+              <AnimatedGlassMetricTile
+                icon={<BottleBadgeIcon size={18} color="#0891B2" />}
+                iconBgColor="#ECFEFF"
+                unitText="Cans"
+                unitTextColor="#64748B"
+                value={scans.length.toLocaleString('en-IN')}
+                label="Delivered Bottles"
+                delay={60}
+                loading={loading}
               />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearchQuery('')}
-                  style={styles.clearSearchBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            </View>
+
+            {/* Row 2 */}
+            <View style={styles.metricsGridRow}>
+              {/* 3. Active Routes */}
+              <AnimatedGlassMetricTile
+                icon={<TruckBadgeIcon size={17} color="#16A34A" />}
+                iconBgColor="#F0FDF4"
+                unitText="Routes"
+                unitTextColor="#64748B"
+                value={uniqueRoutesCount}
+                label="Active Routes"
+                delay={120}
+                loading={loading}
+              />
+
+              {/* 4. Distribution Commission */}
+              <AnimatedGlassMetricTile
+                icon={<RupeeBadgeIcon size={17} color="#7C3AED" />}
+                iconBgColor="#F5F3FF"
+                unitText="@ ₹0.50/can"
+                unitTextColor="#7C3AED"
+                unitBgColor="rgba(245, 243, 255, 0.95)"
+                value={`₹${(scans.length * 0.50).toLocaleString('en-IN', { maximumFractionDigits: 1 })}`}
+                label="Commission Earned"
+                delay={180}
+                loading={loading}
+              />
+            </View>
+          </View>
+
+          {/* ── SEARCH BAR (Pill Rounded Search Bar Matching Attachment) ── */}
+          <View style={styles.searchContainer}>
+            <Search color="#94A3B8" size={17} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search campaign, brand, or location..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <NativePressable
+                onPress={() => setSearchQuery('')}
+                style={styles.clearSearchBtn}
+                hapticType="selection"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X color="#94A3B8" size={18} />
+              </NativePressable>
+            )}
+          </View>
+
+          {/* ── STATUS FILTER TABS (All | Pending | Completed Matching Attachment) ── */}
+          <View style={styles.filterPills}>
+            {(['ALL', 'PENDING', 'COMPLETED'] as const).map((tab) => {
+              const label = tab === 'ALL' ? 'All' : tab === 'PENDING' ? 'Pending' : 'Completed';
+              const isActive = activeFilter === tab;
+              return (
+                <NativePressable
+                  key={tab}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                  onPress={() => setActiveFilter(tab)}
+                  hapticType="selection"
+                  scaleActive={0.96}
                 >
-                  <X color="#94A3B8" size={16} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* ── STATUS FILTER TABS (All | Pending | Completed Matching Attachment) ── */}
-            <View style={styles.filterPills}>
-              {(['ALL', 'PENDING', 'COMPLETED'] as const).map((tab) => {
-                const label = tab === 'ALL' ? 'All' : tab === 'PENDING' ? 'Pending' : 'Completed';
-                const isActive = activeFilter === tab;
-                return (
-                  <TouchableOpacity
-                    key={tab}
-                    style={[styles.filterPill, isActive && styles.filterPillActive]}
-                    onPress={() => {
-                      ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
-                      setActiveFilter(tab);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Scans List */}
-            <View style={styles.scansList}>
-              {filteredRecords.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <View style={styles.emptyIconCircle}>
-                    <QrCode color="#4F46E5" size={26} />
-                  </View>
-                  <Text style={styles.emptyTitle}>No Cans Found For Current Filter</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Scan bottles using the QR Scanner below to record live delivery events on production.
+                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                    {label}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.emptyActionBtn}
-                    onPress={() => setShowQrModal(true)}
-                  >
-                    <CameraIcon color="#FFFFFF" size={14} />
-                    <Text style={styles.emptyActionBtnText}>Scan Bottle Delivery</Text>
-                  </TouchableOpacity>
+                </NativePressable>
+              );
+            })}
+          </View>
+
+          {/* Scans List (Memoized Cards) */}
+          <View style={styles.scansList}>
+            {loading && scans.length === 0 ? (
+              <>
+                <ScanCardSkeleton />
+                <ScanCardSkeleton />
+                <ScanCardSkeleton />
+                <ScanCardSkeleton />
+              </>
+            ) : filteredRecords.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIconCircle}>
+                  <QrCode color="#111C24" size={26} />
                 </View>
-              ) : (
-                filteredRecords.map((scan) => (
-                  <TouchableOpacity
+                <Text style={styles.emptyTitle}>No Cans Found For Current Filter</Text>
+                <Text style={styles.emptySubtitle}>
+                  Scan bottles using the QR Scanner below to record live delivery events on production.
+                </Text>
+                <NativePressable
+                  style={styles.emptyActionBtn}
+                  onPress={() => setShowQrModal(true)}
+                  hapticType="impactLight"
+                  scaleActive={0.96}
+                >
+                  <CameraIcon color="#FFFFFF" size={14} />
+                  <Text style={styles.emptyActionBtnText}>Scan Bottle Delivery</Text>
+                </NativePressable>
+              </View>
+            ) : (
+              <>
+                {displayedScans.map((scan) => (
+                  <DistributorScanCardItem
                     key={scan.id}
-                    style={styles.scanCard}
-                    onPress={() => setSelectedRecord(scan)}
-                    activeOpacity={0.88}
-                  >
-                    <View style={styles.scanCardLeft}>
-                      <View style={styles.scanCardTextWrap}>
-                        <Text style={styles.scanCanId}>{scan.can_id}</Text>
-                        <Text style={styles.scanCampaignSub} numberOfLines={1}>
-                          {scan.campaign_title} • {scan.location_name}
+                    scan={scan}
+                    onSelect={setSelectedRecord}
+                  />
+                ))}
+
+                {/* ── Pagination / Lazy Loading Footer ── */}
+                {filteredRecords.length > PAGE_SIZE && (
+                  <View style={styles.paginationContainer}>
+                    {filteredRecords.length > scansLimit ? (
+                      <NativePressable
+                        style={styles.loadMoreBtn}
+                        onPress={() => setScansLimit((prev) => Math.min(prev + PAGE_SIZE, filteredRecords.length))}
+                        hapticType="selection"
+                        scaleActive={0.95}
+                      >
+                        <Text style={styles.loadMoreBtnText}>
+                          Load More (+{Math.min(PAGE_SIZE, filteredRecords.length - scansLimit)})
                         </Text>
+                        <ChevronDown size={15} color="#111C24" />
+                      </NativePressable>
+                    ) : (
+                      <View style={styles.allLoadedBadge}>
+                        <Check size={13} color="#059669" />
+                        <Text style={styles.allLoadedText}>Showing all {filteredRecords.length} deliveries</Text>
                       </View>
-                    </View>
-                    <View style={styles.scanCardRight}>
-                      <View style={styles.appleVerifiedPill}>
-                        <View style={styles.verifiedDot} />
-                        <Text style={styles.appleVerifiedText}>Verified</Text>
-                      </View>
-                      <Text style={styles.scanTime}>{scan.deliveryTime}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          </>
-        ) : (
-          /* ── 3. SETTLEMENT REPORT TAB ── */
+                    )}
+                    <Text style={styles.paginationCountSub}>
+                      {displayedScans.length} of {filteredRecords.length} deliveries loaded
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* ── TAB 2: SETTLEMENT REPORT (Persistent layout container for 0ms instant tab switching) ── */}
+        <View style={{ display: activeTab === 'settlement-report' ? 'flex' : 'none' }}>
           <View style={styles.settlementSection}>
             <View style={styles.settlementTitleRow}>
               <Text style={styles.settlementHeaderTitle}>Settlement Report Overview</Text>
-              <TouchableOpacity
+              <NativePressable
                 style={styles.exportPdfBtn}
                 onPress={() => triggerToast('✓ Exporting official PDF settlement statement...')}
+                hapticType="impactLight"
+                scaleActive={0.96}
               >
                 <Download color="#FFFFFF" size={12} />
                 <Text style={styles.exportPdfBtnText}>Export PDF</Text>
-              </TouchableOpacity>
+              </NativePressable>
             </View>
             <Text style={styles.settlementSubheader}>PRODUCTION & PAYOUT RECORDS</Text>
 
@@ -742,46 +1079,55 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
             {/* Settlement Cards */}
             <View style={styles.settlementList}>
-              {ledgerRecords.map((record) => (
-                <View key={record.id} style={styles.settlementCard}>
-                  <View style={styles.settlementCardTop}>
-                    <Text style={styles.settlementCardTitle} numberOfLines={1}>
-                      {record.campaignTitle}
-                    </Text>
-                    <Text style={styles.settlementCardAmount}>
-                      +₹{record.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Text>
-                  </View>
+              {loading && ledgerRecords.length === 0 ? (
+                <>
+                  <SettlementCardSkeleton />
+                  <SettlementCardSkeleton />
+                  <SettlementCardSkeleton />
+                </>
+              ) : ledgerRecords.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <TrendingUp color="#94A3B8" size={32} />
+                  <Text style={styles.emptyTitle}>No settlements recorded</Text>
+                  <Text style={styles.emptySubtitle}>Dispatched delivery batches will generate financial settlements here.</Text>
+                </View>
+              ) : (
+                <>
+                  {displayedSettlements.map((record) => (
+                    <DistributorSettlementCardItem key={record.id} record={record} />
+                  ))}
 
-                  <View style={styles.settlementCardBottom}>
-                    <Text style={styles.settlementCardSub}>
-                      {record.brandName} • {record.bottlesCount} cans
-                    </Text>
-                    <View
-                      style={[
-                        styles.settleBadge,
-                        record.settlementStatus === 'SETTLED'
-                          ? styles.settleBadgeGreen
-                          : styles.settleBadgeAmber,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.settleBadgeText,
-                          record.settlementStatus === 'SETTLED'
-                            ? styles.settleBadgeTextGreen
-                            : styles.settleBadgeTextAmber,
-                        ]}
-                      >
-                        {record.settlementStatus === 'SETTLED' ? '✓ Settled' : 'Pending'}
+                  {/* ── Pagination / Lazy Loading Footer ── */}
+                  {ledgerRecords.length > PAGE_SIZE && (
+                    <View style={styles.paginationContainer}>
+                      {ledgerRecords.length > settlementsLimit ? (
+                        <NativePressable
+                          style={styles.loadMoreBtn}
+                          onPress={() => setSettlementsLimit((prev) => Math.min(prev + PAGE_SIZE, ledgerRecords.length))}
+                          hapticType="selection"
+                          scaleActive={0.95}
+                        >
+                          <Text style={styles.loadMoreBtnText}>
+                            Load More (+{Math.min(PAGE_SIZE, ledgerRecords.length - settlementsLimit)})
+                          </Text>
+                          <ChevronDown size={15} color="#111C24" />
+                        </NativePressable>
+                      ) : (
+                        <View style={styles.allLoadedBadge}>
+                          <Check size={13} color="#059669" />
+                          <Text style={styles.allLoadedText}>Showing all {ledgerRecords.length} records</Text>
+                        </View>
+                      )}
+                      <Text style={styles.paginationCountSub}>
+                        {displayedSettlements.length} of {ledgerRecords.length} records loaded
                       </Text>
                     </View>
-                  </View>
-                </View>
-              ))}
+                  )}
+                </>
+              )}
             </View>
           </View>
-        )}
+        </View>
       </ScrollView>
 
       {/* ── 4. FIXED LIQUID GLASS BOTTOM NAVIGATION BAR ── */}
@@ -790,7 +1136,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
           key: 'scan-reports',
           label: 'Scan Report',
           icon: FileText,
-          badge: scans.length > 0 ? scans.length : undefined,
         }}
         rightTab={{
           key: 'settlement-report',
@@ -798,334 +1143,480 @@ export function DistributorDashboardScreen({ navigation }: any) {
           icon: TrendingUp,
         }}
         activeTab={activeTab}
-        onSelectTab={(tabKey) => setActiveTab(tabKey as any)}
+        onSelectTab={handleTabSelect}
         onPressCenterScan={() => setShowQrModal(true)}
       />
 
-      {/* ── MODAL 1: QR SCANNER MODAL WITH LIVE PRODUCTION SYNC ── */}
-      <Modal
+      {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE PRODUCTION SYNC ── */}
+      <DashboardQRScannerModal
         visible={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        onComplete={handleCompleteScanSession}
+        onScan={handleRealQrScanned}
+        onPerformLiveScan={handlePerformLiveScan}
+        title="Burst Scanner"
+        activeCampaignTitle="Live Delivery Batch"
+        isPlant={false}
+      />
+
+      {/* ── Scan Result Output Popup Modal ── */}
+      <ScanResultModal
+        visible={!!scanResultData}
+        data={scanResultData}
+        onScanNext={() => setScanResultData(null)}
+        onClose={() => {
+          setScanResultData(null);
+          setShowQrModal(false);
+        }}
+      />
+
+      {/* ── MODAL 2: EDIT DISTRIBUTOR PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
+      <Modal
+        visible={showProfileModal}
         animationType="fade"
-        transparent={false}
-        onRequestClose={() => setShowQrModal(false)}
+        transparent
+        onRequestClose={() => setShowProfileModal(false)}
       >
-        <View style={styles.scannerModalOverlay}>
-          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-          {/* Fullscreen Camera Stream */}
-          {hasCameraPermission && cameraDevice != null && showQrModal ? (
-            <VisionCamera
-              style={StyleSheet.absoluteFill}
-              device={cameraDevice}
-              isActive={showQrModal}
-              codeScanner={codeScanner}
-              torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
-              enableZoomGesture
-            />
-          ) : null}
-
-          {/* ── 1. FLOATING TOP HEADER ── */}
-          <SafeAreaView style={styles.floatingHeaderSafeArea}>
-            <View style={styles.floatingHeaderContainer}>
-              <Text style={styles.floatingHeaderTitle}>Scan QR Code</Text>
-              <View style={styles.floatingHeaderActions}>
-                <TouchableOpacity
-                  style={styles.floatingCircleBtn}
-                  onPress={handleSwitchCamera}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <SwitchCamera color="#FFFFFF" size={20} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.floatingCircleBtn}
-                  onPress={() => setShowQrModal(false)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <X color="#FFFFFF" size={20} />
-                </TouchableOpacity>
+        <View style={styles.centerModalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
+            <View style={StyleSheet.absoluteFillObject} />
+          </TouchableWithoutFeedback>
+          <View style={styles.profileModalCard}>
+            {/* Header */}
+            <View style={styles.profileModalHeader}>
+              <View style={styles.profileModalHeaderLeft}>
+                <View style={styles.modalIconSquircle}>
+                  <Truck color="#0284C7" size={19} strokeWidth={2.2} />
+                </View>
+                <View style={styles.modalHeaderTitleCol}>
+                  <Text style={styles.profileModalTitle}>Edit Distributor Profile</Text>
+                  <Text style={styles.profileModalSubtitle}>Fleet operations & business specs</Text>
+                </View>
               </View>
+              <NativePressable
+                onPress={() => setShowProfileModal(false)}
+                style={styles.modalCloseCircle}
+                hapticType="selection"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X color="#64748B" size={16} strokeWidth={2.4} />
+              </NativePressable>
             </View>
-          </SafeAreaView>
 
-          {/* ── 2. CENTER VIEWFINDER RETICLE ── */}
-          <View style={styles.scannerBody} pointerEvents="box-none">
-            <View style={styles.viewfinderFrame} pointerEvents="box-none">
-              <View style={[styles.cornerBracket, styles.cornerTopLeft]} />
-              <View style={[styles.cornerBracket, styles.cornerTopRight]} />
-              <View style={[styles.cornerBracket, styles.cornerBottomLeft]} />
-              <View style={[styles.cornerBracket, styles.cornerBottomRight]} />
-
-              {/* Animated Laser Scanning Line */}
-              <Animated.View
-                style={[
-                  styles.laserLine,
-                  {
-                    transform: [
-                      {
-                        translateY: laserAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, width * 0.74],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              />
-
-              {!hasCameraPermission ? (
-                <View style={styles.standbyContent} pointerEvents="auto">
-                  <View style={styles.cameraIconCircle}>
-                    <CameraIcon color="#EF4444" size={28} />
-                  </View>
-                  <Text style={styles.standbyTitle}>Camera Permission Required</Text>
-                  <Text style={styles.standbySub}>Allow camera access to verify bottle deliveries</Text>
-                  <TouchableOpacity
-                    style={styles.retryCameraBtn}
-                    onPress={requestCameraPermission}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.retryCameraBtnText}>Grant Camera Access</Text>
-                  </TouchableOpacity>
+            {/* Non-Scrollable Optimized Grid Form */}
+            <View style={styles.profileFormContainer}>
+              {/* Row 1 (Full Width): Organization Name */}
+              <View style={styles.formFieldGroup}>
+                <Text style={styles.inputLabel}>ORGANIZATION / HUB NAME</Text>
+                <View style={styles.inputFieldContainer}>
+                  <Building2 size={14} color="#0284C7" strokeWidth={2} />
+                  <TextInput
+                    style={styles.modalTextInput}
+                    value={profileOrgName}
+                    onChangeText={setProfileOrgName}
+                    placeholder="Enter hub name"
+                    placeholderTextColor="#94A3B8"
+                  />
                 </View>
-              ) : cameraDevice == null ? (
-                <View style={styles.standbyContent} pointerEvents="auto">
-                  <View style={styles.cameraIconCircle}>
-                    <CameraIcon color="#F59E0B" size={28} />
+              </View>
+
+              {/* Row 2 (2 Columns): Email & Phone */}
+              <View style={styles.formRow2Col}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <Mail size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={profileEmail}
+                      onChangeText={setProfileEmail}
+                      placeholder="Email"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
                   </View>
-                  <Text style={styles.standbyTitle}>Camera Not Detected</Text>
-                  <Text style={styles.standbySub}>
-                    GPS locked at Chennai Hub. Ready for bottle verification.
-                  </Text>
                 </View>
-              ) : null}
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>PHONE NUMBER</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <Phone size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={profilePhone}
+                      onChangeText={setProfilePhone}
+                      placeholder="Phone"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Row 3 (2 Columns): GSTIN & License ID */}
+              <View style={styles.formRow2Col}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>GSTIN NUMBER</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <FileCheck size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={[styles.modalTextInput, styles.monoInputText]}
+                      value={profileGstin}
+                      onChangeText={setProfileGstin}
+                      placeholder="GSTIN"
+                      placeholderTextColor="#94A3B8"
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>PARTNER LICENSE ID</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <ShieldCheck size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={[styles.modalTextInput, styles.monoInputText]}
+                      value={profileLicenseId}
+                      onChangeText={setProfileLicenseId}
+                      placeholder="License ID"
+                      placeholderTextColor="#94A3B8"
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Row 4 (2 Columns): Bank Name & Daily Capacity */}
+              <View style={styles.formRow2Col}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>SETTLEMENT BANK</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <CreditCard size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={profileBankName}
+                      onChangeText={setProfileBankName}
+                      placeholder="Bank name"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>DAILY CAPACITY</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <Gauge size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={profileDeliveryCapacity}
+                      onChangeText={setProfileDeliveryCapacity}
+                      placeholder="10,000 cans/day"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Row 5 (2 Columns): Account No & IFSC */}
+              <View style={styles.formRow2Col}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>ACCOUNT NUMBER</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <CreditCard size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={[styles.modalTextInput, styles.monoInputText]}
+                      value={profileAccountNo}
+                      onChangeText={setProfileAccountNo}
+                      placeholder="Account No"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>IFSC CODE</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <Building2 size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={[styles.modalTextInput, styles.monoInputText]}
+                      value={profileIfsc}
+                      onChangeText={setProfileIfsc}
+                      placeholder="IFSC"
+                      placeholderTextColor="#94A3B8"
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Primary Action CTA */}
+              <NativePressable
+                style={styles.saveProfileBtn}
+                onPress={handleSaveProfile}
+                hapticType="impactMedium"
+                scaleActive={0.97}
+              >
+                <ShieldCheck color="#FFFFFF" size={17} strokeWidth={2.2} />
+                <Text style={styles.saveProfileBtnText}>Save Profile Details</Text>
+              </NativePressable>
             </View>
           </View>
-
-          {/* ── 3. FLOATING BOTTOM INSTRUCTION & COUNTER ── */}
-          <SafeAreaView style={styles.floatingBottomSafeArea}>
-            <View style={styles.floatingBottomContainer}>
-              <View style={styles.floatingInstructionRow}>
-                <QrCode color="#2DD4BF" size={17} />
-                <Text style={styles.floatingInstructionText}>Position the QR code within the frame to scan</Text>
-              </View>
-
-              <View style={styles.floatingScannedRow}>
-                <View style={styles.floatingPulseDot} />
-                <Text style={styles.floatingScannedText}>
-                  Scanned: <Text style={styles.floatingScannedBold}>{scans.length}</Text> / 4000 Cans
-                </Text>
-              </View>
-            </View>
-          </SafeAreaView>
-
-          {/* ── Scan Result Output Popup Modal ── */}
-          <ScanResultModal
-            visible={!!scanResultData}
-            data={scanResultData}
-            onScanNext={handleScanNext}
-            onClose={() => {
-              setScanResultData(null);
-              setShowQrModal(false);
-              setTimeout(() => {
-                isProcessingScanRef.current = false;
-              }, 250);
-            }}
-          />
         </View>
       </Modal>
 
-      {/* ── MODAL 2: EDIT DISTRIBUTOR PROFILE ── */}
-      <Modal visible={showProfileModal} animationType="fade" transparent>
+      {/* ── 3. USER MENU (Anchored Directly Below Top Bar) ── */}
+      {showUserMenu && (
+        <View style={styles.userMenuDropdownOverlay} pointerEvents="box-none">
+          <TouchableWithoutFeedback onPress={() => setShowUserMenu(false)}>
+            <View style={styles.userMenuBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.userMenuCard}>
+            <View style={styles.userMenuEmailBox}>
+              <Text style={styles.userMenuName}>{profileOrgName}</Text>
+              <Text style={styles.userMenuEmail}>{profileEmail}</Text>
+            </View>
+
+            <NativePressable
+              style={styles.userMenuItem}
+              onPress={() => {
+                setShowUserMenu(false);
+                setShowProfileModal(true);
+              }}
+              hapticType="selection"
+              scaleActive={0.98}
+            >
+              <User color="#0284C7" size={17} />
+              <Text style={styles.userMenuItemText}>Edit Profile</Text>
+            </NativePressable>
+
+            <NativePressable
+              style={styles.userMenuItem}
+              onPress={() => {
+                setShowUserMenu(false);
+                setShowChangePasswordModal(true);
+              }}
+              hapticType="selection"
+              scaleActive={0.98}
+            >
+              <KeyRound color="#0284C7" size={17} />
+              <Text style={styles.userMenuItemText}>Change Password</Text>
+            </NativePressable>
+
+            <View style={styles.menuDivider} />
+
+            <NativePressable
+              style={styles.userMenuItem}
+              onPress={() => {
+                setShowUserMenu(false);
+                signOut();
+              }}
+              hapticType="impactMedium"
+              scaleActive={0.98}
+            >
+              <LogOut color="#EF4444" size={17} />
+              <Text style={[styles.userMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
+            </NativePressable>
+          </View>
+        </View>
+      )}
+
+      {/* ── MODAL 4: CHANGE PASSWORD (Apple Themed Redesign) ── */}
+      <Modal
+        visible={showChangePasswordModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowChangePasswordModal(false)}
+      >
         <View style={styles.centerModalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
+            <View style={StyleSheet.absoluteFillObject} />
+          </TouchableWithoutFeedback>
           <View style={styles.profileModalCard}>
             <View style={styles.profileModalHeader}>
               <View style={styles.profileModalHeaderLeft}>
-                <User color="#4F46E5" size={20} />
-                <Text style={styles.profileModalTitle}>Edit Distributor Profile</Text>
+                <View style={styles.modalIconSquircle}>
+                  <KeyRound color="#0284C7" size={20} strokeWidth={2.2} />
+                </View>
+                <View style={styles.modalHeaderTitleCol}>
+                  <Text style={styles.profileModalTitle}>Change Password</Text>
+                  <Text style={styles.profileModalSubtitle}>Secure your distributor account</Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => setShowProfileModal(false)}>
-                <X color="#9CA3AF" size={20} />
-              </TouchableOpacity>
+              <NativePressable
+                onPress={() => setShowChangePasswordModal(false)}
+                style={styles.modalCloseCircle}
+                hapticType="selection"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X color="#64748B" size={16} strokeWidth={2.4} />
+              </NativePressable>
             </View>
 
-            <ScrollView style={styles.profileFormScroll}>
-              <Text style={styles.inputLabel}>Organization Name</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileOrgName}
-                onChangeText={setProfileOrgName}
-              />
-
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileEmail}
-                onChangeText={setProfileEmail}
-              />
-
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profilePhone}
-                onChangeText={setProfilePhone}
-              />
-
-              <Text style={styles.inputLabel}>GSTIN Number</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileGstin}
-                onChangeText={setProfileGstin}
-              />
-
-              <Text style={styles.inputLabel}>Partner License ID</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileLicenseId}
-                onChangeText={setProfileLicenseId}
-              />
-
-              <Text style={styles.inputLabel}>Bank Name</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileBankName}
-                onChangeText={setProfileBankName}
-              />
-
-              <Text style={styles.inputLabel}>Account Number</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileAccountNo}
-                onChangeText={setProfileAccountNo}
-              />
-
-              <Text style={styles.inputLabel}>IFSC Code</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileIfsc}
-                onChangeText={setProfileIfsc}
-              />
-
-              <Text style={styles.inputLabel}>Daily Delivery Capacity</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                value={profileDeliveryCapacity}
-                onChangeText={setProfileDeliveryCapacity}
-              />
-
-              <TouchableOpacity
-                style={styles.saveProfileBtn}
-                onPress={handleSaveProfile}
-                activeOpacity={0.85}
-              >
-                <ShieldCheck color="#FFFFFF" size={18} />
-                <Text style={styles.saveProfileBtnText}>Save Profile Details</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── MODAL 3: USER MENU ── */}
-      <Modal
-        visible={showUserMenu}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowUserMenu(false)}
-      >
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          activeOpacity={1}
-          onPress={() => setShowUserMenu(false)}
-        >
-          <SafeAreaView style={styles.menuSafeArea} pointerEvents="box-none">
-            <View style={styles.userMenuCard}>
-              <View style={styles.userMenuEmailBox}>
-                <Text style={styles.userMenuName}>{profileOrgName}</Text>
-                <Text style={styles.userMenuEmail}>{profileEmail}</Text>
+            {passwordError ? (
+              <View style={styles.modalErrorBanner}>
+                <AlertCircle size={14} color="#EF4444" />
+                <Text style={styles.errorText}>{passwordError}</Text>
               </View>
+            ) : null}
 
-              <TouchableOpacity
-                style={styles.userMenuItem}
-                onPress={() => {
-                  setShowUserMenu(false);
-                  setShowProfileModal(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <User color="#4F46E5" size={17} />
-                <Text style={styles.userMenuItemText}>Edit Profile</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.userMenuItem}
-                onPress={() => {
-                  setShowUserMenu(false);
-                  setShowChangePasswordModal(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <KeyRound color="#4F46E5" size={17} />
-                <Text style={styles.userMenuItemText}>Change Password</Text>
-              </TouchableOpacity>
-
-              <View style={styles.menuDivider} />
-
-              <TouchableOpacity
-                style={styles.userMenuItem}
-                onPress={signOut}
-                activeOpacity={0.7}
-              >
-                <LogOut color="#EF4444" size={17} />
-                <Text style={[styles.userMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* ── MODAL 4: CHANGE PASSWORD ── */}
-      <Modal visible={showChangePasswordModal} animationType="fade" transparent>
-        <View style={styles.centerModalOverlay}>
-          <View style={styles.profileModalCard}>
-            <View style={styles.profileModalHeader}>
-              <Text style={styles.profileModalTitle}>Change Password</Text>
-              <TouchableOpacity onPress={() => setShowChangePasswordModal(false)}>
-                <X color="#9CA3AF" size={20} />
-              </TouchableOpacity>
+            <View style={styles.formFieldGroup}>
+              <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+              <View style={styles.inputFieldContainer}>
+                <Lock size={16} color="#0284C7" strokeWidth={2} />
+                <TextInput
+                  style={styles.modalTextInput}
+                  secureTextEntry
+                  value={oldPassword}
+                  onChangeText={setOldPassword}
+                  placeholder="Enter current password"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
             </View>
 
-            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+            <View style={styles.formFieldGroup}>
+              <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+              <View style={styles.inputFieldContainer}>
+                <KeyRound size={16} color="#0284C7" strokeWidth={2} />
+                <TextInput
+                  style={styles.modalTextInput}
+                  secureTextEntry
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+            </View>
 
-            <Text style={styles.inputLabel}>Current Password</Text>
-            <TextInput
-              style={styles.modalTextInput}
-              secureTextEntry
-              value={oldPassword}
-              onChangeText={setOldPassword}
-              placeholder="••••••••"
-            />
-
-            <Text style={styles.inputLabel}>New Password</Text>
-            <TextInput
-              style={styles.modalTextInput}
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="••••••••"
-            />
-
-            <TouchableOpacity
+            <NativePressable
               style={styles.saveProfileBtn}
               onPress={handleChangePassword}
-              activeOpacity={0.85}
+              hapticType="impactMedium"
+              scaleActive={0.97}
             >
+              <KeyRound color="#FFFFFF" size={18} strokeWidth={2.2} />
               <Text style={styles.saveProfileBtnText}>Update Password</Text>
-            </TouchableOpacity>
+            </NativePressable>
           </View>
         </View>
       </Modal>
+
+      {/* ── MODAL 5: SCAN DELIVERY DETAILS (Apple Popped Bottom Sheet) ── */}
+      {currentRecord && (
+        <PoppedBottomSheetModal
+          visible={Boolean(selectedRecord)}
+          onClose={() => setSelectedRecord(null)}
+        >
+          {({ close }) => (
+            <View style={styles.bottomSheetCard}>
+              {/* Specular Shine Overlay */}
+              <View style={styles.sheetCardSpecularShine} pointerEvents="none" />
+
+              {/* Drag Indicator Handle Touch Area */}
+              <View style={styles.sheetHandleTouchArea}>
+                <View style={styles.sheetHandleIndicator} />
+              </View>
+
+              {/* Header: Squircle Icon + Title/Sub */}
+              <View style={styles.sheetHeaderRow}>
+                <View style={styles.sheetHeaderLeft}>
+                  <View style={styles.sheetHeaderIconSquircle}>
+                    <BottleBadgeIcon size={22} color="#111C24" />
+                  </View>
+                  <View style={styles.sheetHeaderTitleWrap}>
+                    <Text style={styles.sheetHeaderTitle} numberOfLines={1}>
+                      {currentRecord.can_id}
+                    </Text>
+                    <View style={styles.sheetHeaderSubRow}>
+                      <Text style={styles.sheetHeaderBrandText} numberOfLines={1}>
+                        {currentRecord.campaign_title}
+                      </Text>
+                      <View style={styles.appleVerifiedPill}>
+                        <View style={styles.verifiedDot} />
+                        <Text style={styles.appleVerifiedText}>Verified</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* ── Delivery Time Banner ── */}
+              <View style={styles.sheetDeliveryBanner}>
+                <View style={styles.sheetDeliveryIconCircle}>
+                  <Check size={16} color="#059669" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetDeliveryBannerTitle}>Delivery Logged to Production</Text>
+                  <Text style={styles.sheetDeliveryBannerSub}>Recorded {currentRecord.deliveryTime}</Text>
+                </View>
+              </View>
+
+              {/* ── Apple Inset Grouped Specs List ── */}
+              <View style={styles.sheetSpecsGroupCard}>
+                {/* Row 1: Target Route */}
+                <View style={styles.sheetSpecRow}>
+                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                    <MapPinIcon size={16} color="#2563EB" />
+                  </View>
+                  <Text style={styles.sheetSpecLabel}>Delivery Route</Text>
+                  <Text style={styles.sheetSpecValue} numberOfLines={2}>
+                    {currentRecord.location_name}
+                  </Text>
+                </View>
+
+                <View style={styles.sheetSpecDivider} />
+
+                {/* Row 2: Campaign */}
+                <View style={styles.sheetSpecRow}>
+                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#ECFEFF' }]}>
+                    <DocSheetIcon size={16} color="#0891B2" />
+                  </View>
+                  <Text style={styles.sheetSpecLabel}>Campaign Batch</Text>
+                  <Text style={styles.sheetSpecValue} numberOfLines={1}>
+                    {currentRecord.campaign_title}
+                  </Text>
+                </View>
+
+                <View style={styles.sheetSpecDivider} />
+
+                {/* Row 3: Bottle Identifier */}
+                <View style={styles.sheetSpecRow}>
+                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                    <QrCode size={16} color="#16A34A" />
+                  </View>
+                  <Text style={styles.sheetSpecLabel}>Can Serial ID</Text>
+                  <Text style={[styles.sheetSpecValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
+                    {currentRecord.can_id}
+                  </Text>
+                </View>
+
+                <View style={styles.sheetSpecDivider} />
+
+                {/* Row 4: Distributor Commission */}
+                <View style={styles.sheetSpecRow}>
+                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                    <RupeeBadgeIcon size={16} color="#7C3AED" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetSpecLabel}>Earned Commission</Text>
+                    <Text style={styles.sheetSpecSubLabel}>@ ₹0.50 / verified can</Text>
+                  </View>
+                  <Text style={styles.sheetSpecCommissionValue}>+₹0.50</Text>
+                </View>
+              </View>
+
+              {/* ── Full Width Apple Done Button ── */}
+              <NativePressable
+                style={styles.sheetDoneBtn}
+                onPress={close}
+                hapticType="impactLight"
+                scaleActive={0.97}
+              >
+                <Text style={styles.sheetDoneBtnText}>Close Details</Text>
+              </NativePressable>
+            </View>
+          )}
+        </PoppedBottomSheetModal>
+      )}
     </SafeAreaView>
   );
 }
@@ -1133,7 +1624,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   toastContainer: {
     position: 'absolute',
@@ -1159,115 +1650,192 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Header (Indigo Theme)
+  // ── Floating Apple Pill Top Bar ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
     backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: Platform.OS === 'ios' ? 4 : 8,
+    marginBottom: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  headerLeftCol: {
+    flex: 1,
+    marginRight: 12,
+    justifyContent: 'center',
+  },
+  headerCategoryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 2,
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
-    flex: 1,
-    marginRight: 10,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+    textTransform: 'uppercase',
+  },
+  avatarRingWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1.2,
+    borderColor: '#E6D7C3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#4F46E5',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#111C24',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: '#D6B477',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 
   mainScroll: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 110,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 220 : 190,
   },
   titleRow: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   pageTitle: {
-    fontSize: 16,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#111827',
   },
 
-  // ── 4 Circular Stat Badges (Pixel-Matched to Attachment) ──
-  metricsRowWrapper: {
+  // ── Unified Apple Liquid Glass Master Metrics Card ──
+  unifiedGlassMasterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    marginTop: 4,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    gap: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  glassCardSpecularShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  metricsGridRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 2,
-    marginBottom: 20,
-    marginTop: 6,
+    alignItems: 'stretch',
+    gap: 10,
   },
-  metricCircleCol: {
+  glassMetricTile: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 2,
+    height: 108,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    justifyContent: 'space-between',
   },
-  circleBadge: {
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    borderRadius: CIRCLE_SIZE / 2,
+  tileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 32,
+  },
+  tileIconSquircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.8,
-    marginBottom: 8,
   },
-  circleBadgeBlue: {
+  tileIconBlue: {
     backgroundColor: '#EFF6FF',
-    borderColor: '#BAE6FD',
   },
-  circleBadgeGreen: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+  tileIconCyan: {
+    backgroundColor: '#ECFEFF',
   },
-  circleBadgeOrange: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FED7AA',
+  tileIconGreen: {
+    backgroundColor: '#F0FDF4',
   },
-  circleBadgePurple: {
-    backgroundColor: '#FAF5FF',
-    borderColor: '#DDD6FE',
+  tileIconPurple: {
+    backgroundColor: '#F5F3FF',
   },
-  metricStatValue: {
-    fontSize: 16.5,
+  tileUnitPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileUnitText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  tileCounterWrap: {
+    height: 26,
+    justifyContent: 'center',
+  },
+  tileCounter: {
+    fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
-    textAlign: 'center',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
-  metricStatLabel: {
+  tileLabelWrap: {
+    height: 28,
+    justifyContent: 'flex-start',
+  },
+  tileLabel: {
     fontSize: 11.5,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#64748B',
-    textAlign: 'center',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  metricStatSub: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 1,
+    lineHeight: 14.5,
+    letterSpacing: -0.1,
   },
 
   // ── Search Bar (Pill Rounded) ──
@@ -1275,12 +1843,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#EEF2F6',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    marginBottom: 14,
-    height: 48,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    marginBottom: 12,
+    height: 46,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.02,
@@ -1288,7 +1856,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 9,
   },
   searchInput: {
     flex: 1,
@@ -1298,33 +1866,33 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   clearSearchBtn: {
-    padding: 4,
+    padding: 3,
   },
 
   // ── Filter Segment Pills (All | Pending | Completed) ──
   filterPills: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 24,
-    padding: 4,
-    marginBottom: 16,
-    height: 46,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 3.5,
+    marginBottom: 14,
+    height: 42,
     alignItems: 'center',
   },
   filterPill: {
     flex: 1,
-    height: 38,
+    height: 35,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: 11,
   },
   filterPillActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
   filterPillText: {
     fontSize: 13,
@@ -1338,54 +1906,71 @@ const styles = StyleSheet.create({
 
   // Scans List (Apple Minimalist)
   scansList: {
-    gap: 12,
+    gap: 8,
   },
   scanCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 18,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    borderRadius: 18,
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 22,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    marginBottom: 14,
+  },
+  scanCardSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 22,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 14,
   },
   scanCardLeft: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
   },
   scanCardTextWrap: {
-    gap: 3,
+    gap: 2,
   },
   scanCanId: {
-    fontSize: 14.5,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.2,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   scanCampaignSub: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '500',
-    color: '#8E8E93',
+    color: '#64748B',
   },
   scanCardRight: {
     alignItems: 'flex-end',
-    gap: 4,
+    gap: 3,
   },
   appleVerifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9999,
   },
   verifiedDot: {
     width: 6,
@@ -1394,61 +1979,61 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   appleVerifiedText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#059669',
   },
   scanTime: {
     fontSize: 11.5,
     color: '#8E8E93',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
   // Empty State
   emptyState: {
-    padding: 32,
+    padding: 28,
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderStyle: 'dashed',
-    marginTop: 10,
+    marginTop: 8,
   },
   emptyIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 20,
-    backgroundColor: '#EEF2FF',
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: '#FAF7F2',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   emptyTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   emptySubtitle: {
     fontSize: 11,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 16,
-    marginBottom: 16,
+    lineHeight: 15,
+    marginBottom: 14,
   },
   emptyActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: '#111C24',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   emptyActionBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: 'bold',
   },
 
@@ -1460,10 +2045,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   settlementHeaderTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#111827',
   },
@@ -1471,18 +2056,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: '#111C24',
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
     borderRadius: 14,
   },
   exportPdfBtnText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 11.5,
+    fontWeight: '700',
   },
   settlementSubheader: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#64748B',
     letterSpacing: 0.5,
@@ -1491,7 +2076,7 @@ const styles = StyleSheet.create({
   dateDividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 8,
   },
   dateDividerLine: {
     flex: 1,
@@ -1499,69 +2084,110 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
   dateDividerText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#6B7280',
     fontWeight: '600',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
   },
   settlementList: {
     gap: 8,
   },
   settlementCard: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    padding: 12,
-  },
-  settlementCardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  settlementCardSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  settlementCardMiddle: {
+    flex: 1,
+    marginRight: 12,
+    justifyContent: 'center',
   },
   settlementCardTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
-  },
-  settlementCardAmount: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#059669',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  settlementCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+    marginBottom: 2,
   },
   settlementCardSub: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  settlementCardRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  settlementCardAmount: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: -0.2,
+  },
+  appleSettleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    gap: 4.5,
+  },
+  appleSettleBadgeSettled: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  appleSettleBadgePending: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  settleDot: {
+    width: 5.5,
+    height: 5.5,
+    borderRadius: 2.75,
+  },
+  settleDotSettled: {
+    backgroundColor: '#10B981',
+  },
+  settleDotPending: {
+    backgroundColor: '#F59E0B',
+  },
+  appleSettleBadgeText: {
     fontSize: 11,
-    color: '#6B7280',
-  },
-  settleBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  settleBadgeAmber: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
-  settleBadgeGreen: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  settleBadgeText: {
-    fontSize: 10,
     fontWeight: '700',
   },
-  settleBadgeTextAmber: {
-    color: '#B45309',
+  appleSettleBadgeTextSettled: {
+    color: '#059669',
+  },
+  appleSettleBadgeTextPending: {
+    color: '#D97706',
   },
   settleBadgeTextGreen: {
     color: '#047857',
@@ -1600,7 +2226,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   navTabTextActiveIndigo: {
-    color: '#4F46E5',
+    color: '#111C24',
     fontWeight: '800',
   },
   floatingCenterWrap: {
@@ -1612,13 +2238,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#111C24',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -28,
     borderWidth: 4,
     borderColor: '#FFFFFF',
-    shadowColor: '#4F46E5',
+    shadowColor: '#111C24',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -1687,7 +2313,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 48,
     height: 48,
-    borderColor: '#2DD4BF',
+    borderColor: '#D6B477',
   },
   cornerTopLeft: {
     top: 0,
@@ -1723,8 +2349,8 @@ const styles = StyleSheet.create({
     left: 8,
     right: 8,
     height: 2.5,
-    backgroundColor: '#2DD4BF',
-    shadowColor: '#2DD4BF',
+    backgroundColor: '#D6B477',
+    shadowColor: '#D6B477',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 8,
@@ -1740,7 +2366,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: 'rgba(15, 35, 29, 0.8)',
     borderWidth: 1,
-    borderColor: '#065F46',
+    borderColor: '#056B4A',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -1769,7 +2395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: '#111C24',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
@@ -1814,8 +2440,8 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#2DD4BF',
-    shadowColor: '#2DD4BF',
+    backgroundColor: '#D6B477',
+    shadowColor: '#D6B477',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 6,
@@ -1834,134 +2460,217 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Profile Modal
+  // ── Apple Themed Profile & Action Modals ──
   centerModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.60)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
   profileModalCard: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 390,
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 12,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    elevation: 18,
   },
   profileModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#F1F5F9',
     paddingBottom: 12,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   profileModalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    flex: 1,
+  },
+  modalIconSquircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderTitleCol: {
+    flex: 1,
   },
   profileModalTitle: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '800',
-    color: '#111827',
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  profileFormScroll: {
-    maxHeight: 380,
+  profileModalSubtitle: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  modalCloseCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  profileFormContainer: {
+    width: '100%',
+  },
+  formRow2Col: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8,
+  },
+  formCol: {
+    flex: 1,
+  },
+  formFieldGroup: {
+    marginBottom: 8,
   },
   inputLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 5,
-    marginTop: 10,
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+    textTransform: 'uppercase',
+  },
+  inputFieldContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 11,
+    paddingHorizontal: 10,
+    height: 38,
   },
   modalTextInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
+    flex: 1,
+    height: '100%',
+    paddingLeft: 6,
+    paddingVertical: 0,
+    fontSize: 12.5,
+    fontWeight: '600',
     color: '#0F172A',
+  },
+  monoInputText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 0.3,
   },
   saveProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 20,
-    marginBottom: 10,
+    gap: 7,
+    backgroundColor: '#0284C7',
+    height: 44,
+    borderRadius: 13,
+    marginTop: 6,
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveProfileBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  modalErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 14,
   },
 
-  // User Menu Dropdown (Anchored Below Profile Avatar)
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  // User Menu Dropdown (Anchored Directly Below Top Bar)
+  userMenuDropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
-  menuSafeArea: {
-    flex: 1,
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 56 : 52,
-    paddingRight: 16,
+  userMenuBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   userMenuCard: {
-    width: 235,
+    position: 'absolute',
+    top: 80,
+    right: 16,
+    width: 255,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 8,
+    borderRadius: 20,
+    padding: 10,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 20,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
   userMenuEmailBox: {
-    padding: 10,
+    padding: 12,
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 6,
   },
   userMenuName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.1,
   },
   userMenuEmail: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#64748B',
     marginTop: 2,
   },
   userMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    minHeight: 44,
   },
   userMenuItemText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '600',
     color: '#334155',
   },
@@ -1980,5 +2689,254 @@ const styles = StyleSheet.create({
     bottom: 20,
     alignSelf: 'center',
     zIndex: 10,
+  },
+
+  // ── Pagination & Lazy Loading ──
+  paginationContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1,
+    borderColor: '#E6D7C3',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#111C24',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  loadMoreBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#111C24',
+  },
+  allLoadedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  allLoadedText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  paginationCountSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+
+  // ── Apple Popped-Out Sheet (No Dark Background) ──
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 14,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  bottomSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+  },
+  bottomSheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
+    elevation: 25,
+    overflow: 'hidden',
+  },
+  sheetCardSpecularShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 70,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  sheetHandleTouchArea: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 16,
+  },
+  sheetHandleIndicator: {
+    width: 48,
+    height: 5.5,
+    borderRadius: 3,
+    backgroundColor: '#94A3B8',
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sheetHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sheetHeaderIconSquircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetHeaderTitleWrap: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  sheetHeaderTitle: {
+    fontSize: 16.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  sheetHeaderSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 8,
+  },
+  sheetHeaderBrandText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+
+  // Delivery Banner in Sheet
+  sheetDeliveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
+  },
+  sheetDeliveryIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetDeliveryBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  sheetDeliveryBannerSub: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#16A34A',
+    marginTop: 1,
+  },
+
+  // Apple Inset Grouped Specs List
+  sheetSpecsGroupCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  sheetSpecRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    justifyContent: 'space-between',
+  },
+  sheetSpecIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  sheetSpecLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+    flex: 1,
+  },
+  sheetSpecSubLabel: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  sheetSpecValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'right',
+    maxWidth: '50%',
+  },
+  sheetSpecCommissionValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
+    textAlign: 'right',
+  },
+  sheetSpecDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 56,
+  },
+
+  // Done Button
+  sheetDoneBtn: {
+    backgroundColor: '#111C24',
+    borderRadius: 20,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    shadowColor: '#111C24',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sheetDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 });

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import {
@@ -22,6 +21,8 @@ import {
 import { DistributorScanRecord } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { formatTimeOnly } from '../../utils/formatters';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
 
 interface CanDetailModalProps {
   visible: boolean;
@@ -55,9 +56,14 @@ export const CanDetailModal: React.FC<CanDetailModalProps> = ({
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <NativePressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              haptic="selection"
+              hitSlop={8}
+            >
               <X size={20} color={COLORS.slate400} />
-            </TouchableOpacity>
+            </NativePressable>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
@@ -97,7 +103,9 @@ export const CanDetailModal: React.FC<CanDetailModalProps> = ({
               <View style={styles.gridRow}>
                 <View style={styles.gridCol}>
                   <Text style={styles.gridLabel}>Bottling Plant</Text>
-                  <Text style={styles.gridValue}>Aquafina Plant #4</Text>
+                  <Text style={styles.gridValue}>
+                    {scan.plantName || (scan as any).plant_name || 'Certified Bottling Facility'}
+                  </Text>
                 </View>
                 <View style={styles.gridCol}>
                   <Text style={styles.gridLabel}>Scan Time</Text>
@@ -108,21 +116,27 @@ export const CanDetailModal: React.FC<CanDetailModalProps> = ({
                 <View style={styles.gridCol}>
                   <Text style={styles.gridLabel}>Commission Earned</Text>
                   <Text style={[styles.gridValue, { color: COLORS.successText }]}>
-                    +₹1.50 / Can
+                    +₹{Number(scan.payout_amount || 0.50).toFixed(2)} / Can
                   </Text>
                 </View>
                 <View style={styles.gridCol}>
                   <Text style={styles.gridLabel}>Delivery Date</Text>
-                  <Text style={styles.gridValue}>{scan.deliveryDate || 'Today'}</Text>
+                  <Text style={styles.gridValue}>
+                    {scan.deliveryDate || (scan.scannedAt ? new Date(scan.scannedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today')}
+                  </Text>
                 </View>
               </View>
             </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.dismissBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={styles.dismissBtnText}>Close Record</Text>
-            </TouchableOpacity>
+            <AppleButton
+              title="Close Record"
+              variant="primary"
+              size="md"
+              onPress={onClose}
+              haptic="impactLight"
+            />
           </View>
         </View>
       </View>

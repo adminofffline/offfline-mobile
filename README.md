@@ -1,6 +1,6 @@
-# WaterAds Mobile App (Pure React Native CLI)
+# Offfline Mobile App (Pure React Native CLI)
 
-A dedicated, high-performance **Bare React Native (Android + iOS)** mobile application for the **Water Plant / Manufacturer** and **Distributor** operations of the WaterAds platform.
+A dedicated, high-performance **Bare React Native (Android + iOS)** mobile application for the **Water Plant / Manufacturer** and **Distributor** operations of the Offfline platform.
 
 ## Key Features
 

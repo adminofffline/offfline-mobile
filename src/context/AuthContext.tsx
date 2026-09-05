@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, UserRole } from '../types';
 import { SecureStorage } from '../utils/secureStorage';
 import { authApi } from '../api/auth';
@@ -37,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const isAuthenticatingRef = useRef(false);
 
   const signOut = useCallback(async () => {
     try {
@@ -49,35 +50,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const restoreSession = useCallback(async () => {
-    setLoading(true);
     try {
       await SecureStorage.init();
       const savedToken = SecureStorage.getCachedToken() || (await SecureStorage.getToken());
       const savedUser = SecureStorage.getCachedUser() || (await SecureStorage.getUser());
 
-      if (savedToken) {
+      if (savedToken && savedUser) {
         setToken(savedToken);
-        if (savedUser) {
-          const userRole = normalizeRole(savedUser.role);
-          setUser(savedUser);
-          setRole(userRole);
-        }
+        const userRole = normalizeRole(savedUser.role);
+        setUser(savedUser);
+        setRole(userRole);
+        // Instant 0ms transition: unblock loading immediately with cached session
+        setLoading(false);
 
-        // Validate token with live backend
-        try {
-          const res = await authApi.me();
-          if (res.data?.user || res.data?.profile) {
-            const fetchedUser = res.data.user || res.data.profile;
-            const fetchedRole = normalizeRole(fetchedUser.role);
-            setUser(fetchedUser);
-            setRole(fetchedRole);
-            await SecureStorage.setUser(fetchedUser);
-          }
-        } catch (err: any) {
-          if (err.response?.status === 401) {
-            await signOut();
-          }
-        }
+        // Validate / refresh token with live backend asynchronously in background
+        authApi.me()
+          .then(async (res) => {
+            if (res.data?.user || res.data?.profile) {
+              const fetchedUser = res.data.user || res.data.profile;
+              const fetchedRole = normalizeRole(fetchedUser.role);
+              setUser(fetchedUser);
+              setRole(fetchedRole);
+              await SecureStorage.setUser(fetchedUser);
+            }
+          })
+          .catch((err) => {
+            if (err.response?.status === 401) {
+              signOut();
+            }
+          });
+        return;
       }
     } catch (e) {
       console.warn('Failed to restore mobile auth session:', e);
@@ -93,7 +95,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreSession();
   }, [restoreSession, signOut]);
 
-  const signIn = async (phoneOrEmail: string, password: string, selectedRole = 'WATER_PLANT') => {
+  const signIn = useCallback(async (phoneOrEmail: string, password: string, selectedRole = 'WATER_PLANT') => {
+    if (isAuthenticatingRef.current) {
+      return { success: false, message: 'Authentication in progress...' };
+    }
+    isAuthenticatingRef.current = true;
+
     try {
       const payload: any = { password };
       if (phoneOrEmail.includes('@')) {
@@ -130,11 +137,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Login failed. Please check credentials.';
       return { success: false, message: msg };
+    } finally {
+      isAuthenticatingRef.current = false;
     }
-  };
+  }, []);
 
-  const demoLogin = async (targetRole: 'WATER_PLANT' | 'DISTRIBUTOR') => {
+  const demoLogin = useCallback(async (targetRole: 'WATER_PLANT' | 'DISTRIBUTOR') => {
+    if (isAuthenticatingRef.current) {
+      return { success: false, message: 'Authentication in progress...' };
+    }
+    isAuthenticatingRef.current = true;
+
     try {
+      const demoEmail = targetRole === 'WATER_PLANT' ? 'plant.dpi1@offfline.in' : 'distributor@bluedart.com';
+      const demoPass = 'password123';
+
+      // 1. Direct login with production demo credentials
+      const directRes = await signIn(demoEmail, demoPass, targetRole);
+      if (directRes.success) {
+        return { success: true };
+      }
+
+      // 2. Fallback to /auth/demo-login endpoint
       const res = await authApi.demoLogin(targetRole);
       if (res.data?.token && res.data?.user) {
         const u = res.data.user;
@@ -155,10 +179,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Demo login failed';
       return { success: false, message: msg };
+    } finally {
+      isAuthenticatingRef.current = false;
     }
-  };
+  }, [signIn]);
 
-  const updateProfile = async (data: any): Promise<boolean> => {
+  const updateProfile = useCallback(async (data: any): Promise<boolean> => {
     try {
       const res = await authApi.updateProfile(data);
       if (res.data?.user || res.data?.profile) {
@@ -171,9 +197,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       return false;
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     try {
       const res = await authApi.me();
       if (res.data?.user || res.data?.profile) {
@@ -182,22 +208,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await SecureStorage.setUser(fetched);
       }
     } catch (e) {}
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      user,
+      token,
+      role,
+      loading,
+      signIn,
+      demoLogin,
+      signOut,
+      updateProfile,
+      refreshProfile,
+    }),
+    [user, token, role, loading, signIn, demoLogin, signOut, updateProfile, refreshProfile]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        role,
-        loading,
-        signIn,
-        demoLogin,
-        signOut,
-        updateProfile,
-        refreshProfile,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,10 @@
 import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TOKEN_SERVICE = 'in.offfline.waterads.auth';
-const REFRESH_TOKEN_SERVICE = 'in.offfline.waterads.refresh';
-const USER_KEY = 'waterads_user_data';
-const ROLE_KEY = 'waterads_user_role';
+const TOKEN_SERVICE = 'in.offfline.app.auth';
+const REFRESH_TOKEN_SERVICE = 'in.offfline.app.refresh';
+const USER_KEY = 'offfline_user_data';
+const ROLE_KEY = 'offfline_user_role';
 
 // High-speed in-memory cache to eliminate 50-300ms hardware Keychain IPC latency on every network request
 let _inMemoryToken: string | null = null;
@@ -55,7 +55,7 @@ export const SecureStorage = {
     try {
       await Keychain.setGenericPassword('auth_token', token, { service: TOKEN_SERVICE });
     } catch (e) {
-      await AsyncStorage.setItem('waterads_auth_token_fallback', token);
+      await AsyncStorage.setItem('offfline_auth_token_fallback', token);
     }
   },
 
@@ -67,11 +67,11 @@ export const SecureStorage = {
         _inMemoryToken = credentials.password;
         return credentials.password;
       }
-      const fallback = await AsyncStorage.getItem('waterads_auth_token_fallback');
+      const fallback = await AsyncStorage.getItem('offfline_auth_token_fallback');
       _inMemoryToken = fallback;
       return fallback;
     } catch (e) {
-      const fallback = await AsyncStorage.getItem('waterads_auth_token_fallback');
+      const fallback = await AsyncStorage.getItem('offfline_auth_token_fallback');
       _inMemoryToken = fallback;
       return fallback;
     }
@@ -82,7 +82,7 @@ export const SecureStorage = {
     try {
       await Keychain.setGenericPassword('refresh_token', refreshToken, { service: REFRESH_TOKEN_SERVICE });
     } catch (e) {
-      await AsyncStorage.setItem('waterads_refresh_token_fallback', refreshToken);
+      await AsyncStorage.setItem('offfline_refresh_token_fallback', refreshToken);
     }
   },
 
@@ -94,11 +94,11 @@ export const SecureStorage = {
         _inMemoryRefreshToken = credentials.password;
         return credentials.password;
       }
-      const fallback = await AsyncStorage.getItem('waterads_refresh_token_fallback');
+      const fallback = await AsyncStorage.getItem('offfline_refresh_token_fallback');
       _inMemoryRefreshToken = fallback;
       return fallback;
     } catch (e) {
-      const fallback = await AsyncStorage.getItem('waterads_refresh_token_fallback');
+      const fallback = await AsyncStorage.getItem('offfline_refresh_token_fallback');
       _inMemoryRefreshToken = fallback;
       return fallback;
     }
@@ -140,8 +140,8 @@ export const SecureStorage = {
       await AsyncStorage.multiRemove([
         USER_KEY,
         ROLE_KEY,
-        'waterads_auth_token_fallback',
-        'waterads_refresh_token_fallback',
+        'offfline_auth_token_fallback',
+        'offfline_refresh_token_fallback',
       ]);
     } catch (e) {}
   },

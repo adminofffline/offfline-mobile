@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { Scan, LucideIcon } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { NativePressable } from './common/NativePressable';
 
 const { width } = Dimensions.get('window');
 const BAR_WIDTH = Math.min(width - 32, 400);
-const TAB_PADDING = 6;
-const ORB_GAP_WIDTH = 64;
+const TAB_PADDING = 5;
+const ORB_GAP_WIDTH = 58;
 const TAB_WIDTH = (BAR_WIDTH - ORB_GAP_WIDTH - TAB_PADDING * 2) / 2;
 const TRAVEL_DISTANCE = TAB_WIDTH + ORB_GAP_WIDTH;
 
@@ -34,7 +35,7 @@ export interface LiquidGlassNavBarProps {
   onPressCenterScan: () => void;
 }
 
-export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
+export const LiquidGlassNavBarComponent: React.FC<LiquidGlassNavBarProps> = ({
   leftTab,
   rightTab,
   activeTab,
@@ -53,35 +54,35 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
   // ── Orb Press State (Smooth Linear Transition, No Bounce) ──
   const orbScale = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    // Smooth composite liquid slider glide (Linear + Cubic Easing, Zero Bouncing)
+  const animateSlider = (toLeft: boolean) => {
     Animated.timing(slideAnim, {
-      toValue: isLeft ? 0 : 1,
-      duration: 260,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      toValue: toLeft ? 0 : 1,
+      duration: 170,
+      easing: Easing.bezier(0.2, 0, 0, 1),
       useNativeDriver: true,
     }).start();
-  }, [isLeft, slideAnim]);
+  };
+
+  useEffect(() => {
+    animateSlider(isLeft);
+  }, [isLeft]);
 
   const triggerMinuteRipple = (rippleAnim: Animated.Value) => {
     rippleAnim.setValue(0);
     Animated.timing(rippleAnim, {
       toValue: 1,
-      duration: 240,
+      duration: 180,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   };
 
   const handleTabPress = (tabKey: string, isLeftTarget: boolean) => {
-    try {
-      ReactNativeHapticFeedback.trigger('selection', {
-        enableVibrateFallback: true,
-        ignoreAndroidSystemSettings: false,
-      });
-    } catch (e) {}
-
+    // 1. Instant 0ms synchronous slider animation on touch
+    animateSlider(isLeftTarget);
     triggerMinuteRipple(isLeftTarget ? leftRipple : rightRipple);
+
+    // 2. Notify parent
     onSelectTab(tabKey);
   };
 
@@ -158,10 +159,11 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
         </Animated.View>
 
         {/* ── Left Tab Target Area ── */}
-        <TouchableOpacity
+        <NativePressable
           style={styles.tabTarget}
           onPress={() => handleTabPress(leftTab.key, true)}
-          activeOpacity={0.88}
+          haptic="selection"
+          scaleActive={0.96}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           {/* Minute Liquid Glass Ripple */}
@@ -207,16 +209,17 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
           >
             {leftTab.label}
           </Text>
-        </TouchableOpacity>
+        </NativePressable>
 
         {/* ── Center Reservation Gap for Floating Orb ── */}
         <View style={styles.orbReservedGap} />
 
         {/* ── Right Tab Target Area ── */}
-        <TouchableOpacity
+        <NativePressable
           style={styles.tabTarget}
           onPress={() => handleTabPress(rightTab.key, false)}
-          activeOpacity={0.88}
+          haptic="selection"
+          scaleActive={0.96}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           {/* Minute Liquid Glass Ripple */}
@@ -262,59 +265,61 @@ export const LiquidGlassNavBar: React.FC<LiquidGlassNavBarProps> = ({
           >
             {rightTab.label}
           </Text>
-        </TouchableOpacity>
+        </NativePressable>
       </View>
 
-      {/* ── Center Elevated Floating Liquid Glass Scan Orb ── */}
-      <View style={styles.orbAnchorWrap} pointerEvents="box-none">
+      {/* ── Center Floating Orb Structure ── */}
+      <Animated.View
+        style={[
+          styles.orbAnchorWrap,
+          {
+            transform: [{ scale: orbScale }],
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {/* Ambient Lighting Glow Halo */}
+        <View style={styles.orbAmbientHalo} />
+
+        {/* Minute Liquid Ripple on Orb */}
         <Animated.View
           style={[
-            styles.orbContainer,
-            { transform: [{ scale: orbScale }] },
+            styles.orbLiquidRipple,
+            {
+              opacity: orbRipple.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.5, 0],
+              }),
+              transform: [
+                {
+                  scale: orbRipple.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1.35],
+                  }),
+                },
+              ],
+            },
           ]}
+          pointerEvents="none"
+        />
+
+        {/* Liquid Frosted Glass Orb Surface */}
+        <NativePressable
+          style={styles.orbGlassSurface}
+          onPressIn={handleOrbPressIn}
+          onPressOut={handleOrbPressOut}
+          onPress={handleOrbPress}
+          haptic="impactMedium"
+          scaleActive={0.94}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          {/* Ambient Halo Diffused Glass Glow */}
-          <View style={styles.orbAmbientHalo} />
-
-          {/* Minute Liquid Ripple on Orb */}
-          <Animated.View
-            style={[
-              styles.orbLiquidRipple,
-              {
-                opacity: orbRipple.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.5, 0],
-                }),
-                transform: [
-                  {
-                    scale: orbRipple.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.9, 1.35],
-                    }),
-                  },
-                ],
-              },
-            ]}
-            pointerEvents="none"
-          />
-
-          {/* Liquid Frosted Glass Orb Surface */}
-          <TouchableOpacity
-            style={styles.orbGlassSurface}
-            onPressIn={handleOrbPressIn}
-            onPressOut={handleOrbPressOut}
-            onPress={handleOrbPress}
-            activeOpacity={0.92}
-            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          >
-            {/* Top Glass Specular Shine */}
-            <View style={styles.orbSpecularShine} />
-            
-            {/* 4-Corner Viewfinder Reticle Icon */}
-            <Scan color="#334155" size={28} strokeWidth={2.4} />
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+          {/* Top Glass Specular Shine */}
+          <View style={styles.orbSpecularShine} />
+          
+          {/* 4-Corner Viewfinder Reticle Icon */}
+          <Scan color="#334155" size={25} strokeWidth={2.4} />
+        </NativePressable>
+      </Animated.View>
     </View>
   );
 };
@@ -328,13 +333,13 @@ const styles = StyleSheet.create({
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 12,
   },
   glassCapsuleBar: {
     width: BAR_WIDTH,
-    height: 66,
+    height: 62,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    borderRadius: 33,
+    borderRadius: 31,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.95)',
     flexDirection: 'row',
@@ -343,10 +348,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: TAB_PADDING,
     position: 'relative',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 12,
   },
   slidingLiquidPill: {
     position: 'absolute',
@@ -359,10 +364,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 1)',
     shadowColor: '#94A3B8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.20,
+    shadowRadius: 8,
+    elevation: 3,
     overflow: 'hidden',
   },
   pillSpecularShine: {
@@ -370,7 +375,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 24,
+    height: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
@@ -385,9 +390,9 @@ const styles = StyleSheet.create({
   },
   liquidRippleRing: {
     position: 'absolute',
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(226, 232, 240, 0.6)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.8)',
@@ -399,7 +404,7 @@ const styles = StyleSheet.create({
   },
   redBadgePill: {
     position: 'absolute',
-    top: -4,
+    top: -3,
     right: -10,
     backgroundColor: '#EF4444',
     borderRadius: 999,
@@ -418,8 +423,8 @@ const styles = StyleSheet.create({
   },
   tabLabelText: {
     fontSize: 11.5,
-    marginTop: 3,
-    letterSpacing: -0.15,
+    marginTop: 2.5,
+    letterSpacing: -0.1,
   },
   activeLabel: {
     color: '#0F172A',
@@ -435,53 +440,55 @@ const styles = StyleSheet.create({
   },
   orbAnchorWrap: {
     position: 'absolute',
-    top: -20,
+    top: -16,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 110,
   },
   orbContainer: {
-    width: 72,
-    height: 72,
+    width: 66,
+    height: 66,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   orbAmbientHalo: {
     position: 'absolute',
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: 'rgba(226, 232, 240, 0.6)',
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.32,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 8,
   },
   orbLiquidRipple: {
     position: 'absolute',
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: 'rgba(226, 232, 240, 0.7)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   orbGlassSurface: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 1)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#334155',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -490,11 +497,12 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 32,
+    height: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
 });
 
+export const LiquidGlassNavBar = React.memo(LiquidGlassNavBarComponent);
 export default LiquidGlassNavBar;

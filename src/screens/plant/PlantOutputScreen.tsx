@@ -27,27 +27,8 @@ import { Header } from '../../components/Header';
 import { UserMenuModal } from '../../components/UserMenuModal';
 import { PlantProfileModal } from './PlantProfileModal';
 
-const initialLogs: PlantDailyOutputEntry[] = [
-  {
-    id: 'log_1',
-    date: new Date().toISOString().split('T')[0],
-    cans_filled: 24500,
-    stickers_applied: 24500,
-    batch_notes: 'Shift A & B production complete (Ad Campaign)',
-    status: 'VERIFIED',
-  },
-  {
-    id: 'log_2',
-    date: '2026-07-24',
-    cans_filled: 22000,
-    stickers_applied: 22000,
-    batch_notes: 'Automatic labeling line running at rate',
-    status: 'VERIFIED',
-  },
-];
-
 export const PlantOutputScreen: React.FC = () => {
-  const [entries, setEntries] = useState<PlantDailyOutputEntry[]>(initialLogs);
+  const [entries, setEntries] = useState<PlantDailyOutputEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
 
@@ -65,7 +46,7 @@ export const PlantOutputScreen: React.FC = () => {
     try {
       const res = await plantApi.getOutput().catch(() => null);
       const list = res?.data?.entries || res?.data;
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         setEntries(list);
       }
     } catch (e) {

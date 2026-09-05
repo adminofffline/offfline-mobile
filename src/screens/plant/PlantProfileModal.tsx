@@ -4,10 +4,8 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
   ScrollView,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import {
   X,
@@ -22,6 +20,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { plantApi } from '../../api/plant';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
 
 interface PlantProfileModalProps {
   visible: boolean;
@@ -31,12 +31,18 @@ interface PlantProfileModalProps {
 export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, onClose }) => {
   const { user, updateProfile } = useAuth();
 
-  const [plantName, setPlantName] = useState(user?.plantName || user?.companyName || 'Aquafina Plant #4');
-  const [isiNumber, setIsiNumber] = useState(user?.isiNumber || user?.isi_registration_number || 'ISI/9044-BLR');
-  const [dailyCapacity, setDailyCapacity] = useState(user?.dailyCapacity || '50,000 Units/day');
+  const [plantName, setPlantName] = useState(
+    user?.plantName || user?.companyName || user?.fullName || 'Water Plant Facility'
+  );
+  const [isiNumber, setIsiNumber] = useState(
+    user?.isiNumber || user?.isi_registration_number || user?.plant_profile?.isi_licence_number || ''
+  );
+  const [dailyCapacity, setDailyCapacity] = useState(
+    user?.dailyCapacity || (user?.plant_profile?.max_capacity ? `${user.plant_profile.max_capacity} Units/day` : '50,000 Units/day')
+  );
   const [distributorCapacity, setDistributorCapacity] = useState('10,000 cans');
-  const [address, setAddress] = useState(user?.address || 'Plot 14, Peenya Industrial Area, Chennai');
-  const [hasInhousePrinter, setHasInhousePrinter] = useState(false);
+  const [address, setAddress] = useState(user?.address || user?.plant_profile?.address || 'Chennai Facility');
+  const [hasInhousePrinter, setHasInhousePrinter] = useState(Boolean(user?.plant_profile?.has_inhouse_printer));
 
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -89,9 +95,14 @@ export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, o
                 <Text style={styles.headerSubtitle}>ISI Certification and daily output specs</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <NativePressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              haptic="selection"
+              hitSlop={8}
+            >
               <X size={20} color={COLORS.slate400} />
-            </TouchableOpacity>
+            </NativePressable>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
@@ -150,9 +161,11 @@ export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, o
                 />
               </View>
 
-              <TouchableOpacity
+              <NativePressable
                 style={styles.checkboxRow}
                 onPress={() => setHasInhousePrinter(!hasInhousePrinter)}
+                haptic="selection"
+                scaleActive={0.99}
               >
                 <View style={[styles.checkbox, hasInhousePrinter && styles.checkboxActive]}>
                   {hasInhousePrinter && <CheckCircle2 size={12} color={COLORS.white} />}
@@ -161,26 +174,19 @@ export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, o
                   <Text style={styles.checkboxLabel}>Facility Has In-House Label Printing</Text>
                   <Text style={styles.checkboxSubtext}>Check if plant applies shrink sleeves internally</Text>
                 </View>
-              </TouchableOpacity>
+              </NativePressable>
             </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.saveBtn}
+            <AppleButton
+              title="Save Facility Profile"
+              variant="plant"
+              size="md"
+              loading={isSaving}
               onPress={handleSave}
-              disabled={isSaving}
-              activeOpacity={0.8}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <>
-                  <Save size={16} color={COLORS.white} />
-                  <Text style={styles.saveBtnText}>Save Facility Profile</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              icon={<Save size={16} color={COLORS.white} />}
+            />
           </View>
         </View>
       </View>

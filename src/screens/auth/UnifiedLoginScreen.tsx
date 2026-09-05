@@ -4,8 +4,6 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,8 +15,6 @@ import {
   Factory,
   Truck,
   ArrowRight,
-  ShieldCheck,
-  ChevronDown,
   Lock,
   Phone,
   AlertCircle,
@@ -26,7 +22,9 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
-import { CONFIG } from '../../constants/config';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
+import { OffflineBrandWordmark } from '../../components/common/OffflineBrandWordmark';
 
 interface UnifiedLoginScreenProps {
   navigation: any;
@@ -36,8 +34,6 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
   const { signIn, demoLogin } = useAuth();
 
   const [selectedRole, setSelectedRole] = useState<'WATER_PLANT' | 'DISTRIBUTOR'>('WATER_PLANT');
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-
   const [phoneOrEmail, setPhoneOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +44,7 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
   const isPlant = selectedRole === 'WATER_PLANT';
 
   const handleLogin = async () => {
+    if (isLoading) return;
     if (!phoneOrEmail.trim() || !password) {
       setErrorMessage('Please enter both Phone/Email and Password.');
       return;
@@ -56,24 +53,29 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
     setIsLoading(true);
     setErrorMessage(null);
 
-    const res = await signIn(phoneOrEmail, password, selectedRole);
-    setIsLoading(false);
-
-    if (!res.success) {
-      setErrorMessage(res.message || 'Login failed. Please check your credentials.');
+    try {
+      const res = await signIn(phoneOrEmail, password, selectedRole);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Login failed. Please check your credentials.');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDemoLogin = async (role: 'WATER_PLANT' | 'DISTRIBUTOR') => {
+    if (isLoading) return;
     setIsLoading(true);
     setErrorMessage(null);
     setSelectedRole(role);
 
-    const res = await demoLogin(role);
-    setIsLoading(false);
-
-    if (!res.success) {
-      setErrorMessage(res.message || 'Demo login failed');
+    try {
+      const res = await demoLogin(role);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Demo login failed');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,126 +92,86 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
         >
           {/* Brand Header */}
           <View style={styles.brandHeader}>
-            <View style={styles.brandLogoBox}>
-              <Text style={styles.brandLogoLetter}>O</Text>
-            </View>
-            <Text style={styles.brandTitle}>Offfline</Text>
-            <View style={styles.portalBadge}>
-              <ShieldCheck size={11} color={COLORS.distributorAccent} />
-              <Text style={styles.portalBadgeText}>MOBILE OPERATOR PORTAL</Text>
-            </View>
-            <Text style={styles.brandTagline}>
-              Decentralized Physical Ad & Bottling Network
-            </Text>
+            <OffflineBrandWordmark
+              size="lg"
+              align="center"
+            />
           </View>
 
           {/* Login Card */}
           <View style={styles.card}>
-            <Text style={styles.cardHeading}>Sign in to your account</Text>
-            <Text style={styles.cardSubheading}>
-              Select your role to access your dedicated terminal
-            </Text>
+            <Text style={styles.cardHeading}>Sign In</Text>
 
             {/* Error Alert */}
             {errorMessage && (
               <View style={styles.errorBanner}>
-                <AlertCircle size={15} color={COLORS.error} />
+                <AlertCircle size={14} color={COLORS.error} />
                 <Text style={styles.errorBannerText}>{errorMessage}</Text>
               </View>
             )}
 
-            {/* Role Switcher Dropdown */}
+            {/* Clean 2-Segmented Role Switcher */}
             <View style={styles.inputGroup}>
-              <Text style={styles.fieldLabel}>OPERATOR ROLE</Text>
-              <TouchableOpacity
-                style={[
-                  styles.roleSelector,
-                  isPlant ? styles.plantBorderHighlight : styles.distributorBorderHighlight,
-                ]}
-                onPress={() => setShowRoleDropdown(!showRoleDropdown)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.roleSelectorLeft}>
-                  <View
+              <Text style={styles.fieldLabel}>ROLE</Text>
+              <View style={styles.segmentedRoleWrap}>
+                <NativePressable
+                  style={[
+                    styles.segmentTab,
+                    isPlant && styles.segmentTabActive,
+                  ]}
+                  onPress={() => setSelectedRole('WATER_PLANT')}
+                  haptic="selection"
+                  scaleActive={0.98}
+                >
+                  <Factory
+                    size={15}
+                    color={isPlant ? COLORS.plantAccent : COLORS.slate500}
+                  />
+                  <Text
                     style={[
-                      styles.roleIconCircle,
-                      isPlant ? styles.plantIconCircle : styles.distributorIconCircle,
+                      styles.segmentTabText,
+                      isPlant && styles.segmentTabTextActivePlant,
                     ]}
                   >
-                    {isPlant ? (
-                      <Factory size={16} color={COLORS.plantAccent} />
-                    ) : (
-                      <Truck size={16} color={COLORS.distributorAccent} />
-                    )}
-                  </View>
-                  <View>
-                    <Text style={styles.roleTitle}>
-                      {isPlant ? 'Water Plant / Bottler' : 'Water Distributor'}
-                    </Text>
-                    <Text style={styles.roleDesc}>
-                      {isPlant ? 'Production & Labeling' : 'Delivery & Local Scanning'}
-                    </Text>
-                  </View>
-                </View>
-                <ChevronDown
-                  size={16}
-                  color={COLORS.slate400}
-                  style={showRoleDropdown && { transform: [{ rotate: '180deg' }] }}
-                />
-              </TouchableOpacity>
+                    Plant
+                  </Text>
+                </NativePressable>
 
-              {/* Dropdown Options */}
-              {showRoleDropdown && (
-                <View style={styles.dropdownMenu}>
-                  <TouchableOpacity
-                    style={[styles.dropdownItem, isPlant && styles.dropdownItemActive]}
-                    onPress={() => {
-                      setSelectedRole('WATER_PLANT');
-                      setShowRoleDropdown(false);
-                    }}
+                <NativePressable
+                  style={[
+                    styles.segmentTab,
+                    !isPlant && styles.segmentTabActive,
+                  ]}
+                  onPress={() => setSelectedRole('DISTRIBUTOR')}
+                  haptic="selection"
+                  scaleActive={0.98}
+                >
+                  <Truck
+                    size={15}
+                    color={!isPlant ? COLORS.distributorAccent : COLORS.slate500}
+                  />
+                  <Text
+                    style={[
+                      styles.segmentTabText,
+                      !isPlant && styles.segmentTabTextActiveDistributor,
+                    ]}
                   >
-                    <Factory size={16} color={isPlant ? COLORS.plantAccent : COLORS.slate500} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.dropdownItemTitle, isPlant && { color: COLORS.plantAccent }]}>
-                        Water Plant / Bottler
-                      </Text>
-                      <Text style={styles.dropdownItemSubtitle}>
-                        Batch bottling & label QR verification
-                      </Text>
-                    </View>
-                    {isPlant && <ShieldCheck size={14} color={COLORS.plantAccent} />}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.dropdownItem, !isPlant && styles.dropdownItemActive]}
-                    onPress={() => {
-                      setSelectedRole('DISTRIBUTOR');
-                      setShowRoleDropdown(false);
-                    }}
-                  >
-                    <Truck size={16} color={!isPlant ? COLORS.distributorAccent : COLORS.slate500} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.dropdownItemTitle, !isPlant && { color: COLORS.distributorAccent }]}>
-                        Water Distributor
-                      </Text>
-                      <Text style={styles.dropdownItemSubtitle}>
-                        Retail scans & delivery logging
-                      </Text>
-                    </View>
-                    {!isPlant && <ShieldCheck size={14} color={COLORS.distributorAccent} />}
-                  </TouchableOpacity>
-                </View>
-              )}
+                    Distributor
+                  </Text>
+                </NativePressable>
+              </View>
             </View>
 
             {/* Phone or Email */}
             <View style={styles.inputGroup}>
-              <Text style={styles.fieldLabel}>MOBILE NUMBER OR EMAIL</Text>
+              <Text style={styles.fieldLabel}>EMAIL OR PHONE</Text>
               <View style={styles.inputWrapper}>
-                <Phone size={16} color={COLORS.slate400} style={styles.inputIcon} />
+                <View style={styles.inputIconBox}>
+                  <Phone size={15} color={COLORS.slate400} />
+                </View>
                 <TextInput
                   style={styles.textInput}
-                  placeholder={isPlant ? 'mfr@offfline.in or +91 98765 43210' : 'distributor@offfline.in'}
+                  placeholder={isPlant ? 'mfr@offfline.in or mobile' : 'distributor@offfline.in or mobile'}
                   placeholderTextColor={COLORS.slate400}
                   value={phoneOrEmail}
                   onChangeText={setPhoneOrEmail}
@@ -223,51 +185,53 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.fieldLabel}>PASSWORD</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+                <NativePressable
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                  haptic="impactLight"
+                  hitSlop={8}
+                >
                   <Text style={styles.forgotPasswordText}>Forgot?</Text>
-                </TouchableOpacity>
+                </NativePressable>
               </View>
               <View style={styles.inputWrapper}>
-                <Lock size={16} color={COLORS.slate400} style={styles.inputIcon} />
+                <View style={styles.inputIconBox}>
+                  <Lock size={15} color={COLORS.slate400} />
+                </View>
                 <TextInput
-                  style={[styles.textInput, { paddingRight: 40 }]}
-                  placeholder="••••••••"
+                  style={styles.textInput}
+                  placeholder="Password"
                   placeholderTextColor={COLORS.slate400}
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />
-                <TouchableOpacity
+                <NativePressable
                   style={styles.eyeBtn}
                   onPress={() => setShowPassword(!showPassword)}
+                  haptic="impactLight"
+                  hitSlop={8}
                 >
                   {showPassword ? (
                     <EyeOff size={16} color={COLORS.slate400} />
                   ) : (
                     <Eye size={16} color={COLORS.slate400} />
                   )}
-                </TouchableOpacity>
+                </NativePressable>
               </View>
             </View>
 
             {/* Sign In Button */}
-            <TouchableOpacity
-              style={styles.signInBtn}
+            <AppleButton
+              title="Sign In"
+              variant="primary"
+              size="md"
+              loading={isLoading}
               onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <>
-                  <Text style={styles.signInBtnText}>Sign In</Text>
-                  <ArrowRight size={16} color={COLORS.white} />
-                </>
-              )}
-            </TouchableOpacity>
+              rightIcon={<ArrowRight size={15} color={COLORS.white} />}
+              style={{ marginTop: 4 }}
+            />
 
-            {/* Quick Demo Bypass for Testing */}
+            {/* 1-Click Demo Login */}
             <View style={styles.demoSection}>
               <View style={styles.demoDividerRow}>
                 <View style={styles.demoDivider} />
@@ -276,33 +240,39 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
               </View>
 
               <View style={styles.demoButtonsRow}>
-                <TouchableOpacity
+                <NativePressable
                   style={[styles.demoBtn, styles.demoBtnPlant]}
                   onPress={() => handleDemoLogin('WATER_PLANT')}
                   disabled={isLoading}
+                  haptic="impactLight"
+                  scaleActive={0.96}
                 >
-                  <Zap size={13} color={COLORS.plantAccent} />
+                  <Zap size={12} color={COLORS.plantAccent} />
                   <Text style={styles.demoBtnTextPlant}>Demo Plant</Text>
-                </TouchableOpacity>
+                </NativePressable>
 
-                <TouchableOpacity
+                <NativePressable
                   style={[styles.demoBtn, styles.demoBtnDistributor]}
                   onPress={() => handleDemoLogin('DISTRIBUTOR')}
                   disabled={isLoading}
+                  haptic="impactLight"
+                  scaleActive={0.96}
                 >
-                  <Zap size={13} color={COLORS.distributorAccent} />
+                  <Zap size={12} color={COLORS.distributorAccent} />
                   <Text style={styles.demoBtnTextDistributor}>Demo Distributor</Text>
-                </TouchableOpacity>
+                </NativePressable>
               </View>
             </View>
 
             {/* Registration Link */}
             <View style={styles.registerPrompt}>
               <Text style={styles.registerPromptText}>Don't have an operator account?</Text>
-              <TouchableOpacity
+              <NativePressable
                 onPress={() =>
                   navigation.navigate(isPlant ? 'PlantRegister' : 'DistributorRegister')
                 }
+                haptic="impactLight"
+                hitSlop={6}
               >
                 <Text
                   style={[
@@ -312,14 +282,8 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
                 >
                   {isPlant ? 'Register Plant' : 'Register Distributor'}
                 </Text>
-              </TouchableOpacity>
+              </NativePressable>
             </View>
-          </View>
-
-          {/* Footer Backend Status */}
-          <View style={styles.footerInfo}>
-            <View style={styles.connectedDot} />
-            <Text style={styles.footerEndpointText}>Connected: {CONFIG.API_BASE_URL}</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -330,84 +294,40 @@ export const UnifiedLoginScreen: React.FC<UnifiedLoginScreenProps> = ({ navigati
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.slate50,
+    backgroundColor: '#FAF7F2',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
     justifyContent: 'center',
   },
   brandHeader: {
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  brandLogoBox: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.slate900,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-    ...SHADOWS.md,
-  },
-  brandLogoLetter: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: COLORS.white,
-  },
-  brandTitle: {
-    ...TYPOGRAPHY.xxl,
-    fontWeight: '900',
-    color: COLORS.slate900,
-    letterSpacing: -0.5,
-  },
-  portalBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.distributorBg,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-    gap: 4,
-    marginTop: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.distributorBorder,
-  },
-  portalBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: COLORS.distributorAccent,
-    letterSpacing: 0.5,
-  },
-  brandTagline: {
-    ...TYPOGRAPHY.xs,
-    fontWeight: '600',
-    color: COLORS.slate500,
-    marginTop: SPACING.xs,
+    marginBottom: 20,
   },
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.md,
+    borderColor: '#EAE6DF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 3,
   },
   cardHeading: {
-    ...TYPOGRAPHY.lg,
+    fontSize: 18,
     fontWeight: '800',
-    color: COLORS.slate900,
-  },
-  cardSubheading: {
-    ...TYPOGRAPHY.xs,
-    color: COLORS.slate500,
-    marginTop: 2,
-    marginBottom: SPACING.lg,
+    color: '#111C24',
+    letterSpacing: -0.3,
+    marginBottom: 16,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -415,233 +335,177 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.errorBg,
     borderWidth: 1,
     borderColor: COLORS.errorBorder,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    gap: SPACING.xs,
-    marginBottom: SPACING.md,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    marginBottom: 14,
   },
   errorBannerText: {
-    ...TYPOGRAPHY.xs,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: COLORS.errorText,
     flex: 1,
   },
   inputGroup: {
-    marginBottom: SPACING.md,
+    marginBottom: 14,
   },
   fieldLabel: {
-    ...TYPOGRAPHY.xs,
+    fontSize: 10.5,
     fontWeight: '800',
-    color: COLORS.slate700,
+    color: '#64748B',
     marginBottom: 6,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 6,
   },
   forgotPasswordText: {
-    ...TYPOGRAPHY.xs,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: COLORS.slate500,
+    color: '#64748B',
   },
-  roleSelector: {
+  segmentedRoleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.slate50,
-    borderWidth: 1.5,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.sm,
-  },
-  plantBorderHighlight: {
-    borderColor: COLORS.plantBorder,
-  },
-  distributorBorderHighlight: {
-    borderColor: COLORS.distributorBorder,
-  },
-  roleSelectorLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  roleIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  plantIconCircle: {
-    backgroundColor: COLORS.plantBg,
-  },
-  distributorIconCircle: {
-    backgroundColor: COLORS.distributorBg,
-  },
-  roleTitle: {
-    ...TYPOGRAPHY.xs,
-    fontWeight: '800',
-    color: COLORS.slate900,
-  },
-  roleDesc: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: COLORS.slate500,
-  },
-  dropdownMenu: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
+    backgroundColor: '#F5F1E8',
+    borderRadius: 14,
+    padding: 3.5,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    marginTop: SPACING.xs,
-    padding: SPACING.xs,
-    ...SHADOWS.md,
+    borderColor: '#EAE6DF',
     gap: 4,
   },
-  dropdownItem: {
+  segmentTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.sm,
-    borderRadius: RADIUS.md,
-    gap: SPACING.sm,
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 9.5,
+    borderRadius: 11,
   },
-  dropdownItemActive: {
-    backgroundColor: COLORS.slate50,
+  segmentTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  dropdownItemTitle: {
-    ...TYPOGRAPHY.xs,
+  segmentTabText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  segmentTabTextActivePlant: {
+    color: '#056B4A',
     fontWeight: '800',
-    color: COLORS.slate900,
   },
-  dropdownItemSubtitle: {
-    fontSize: 10,
-    color: COLORS.slate500,
+  segmentTabTextActiveDistributor: {
+    color: '#111C24',
+    fontWeight: '800',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.slate50,
+    backgroundColor: '#FAF7F2',
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.lg,
-    position: 'relative',
+    borderColor: '#EAE6DF',
+    borderRadius: 13,
+    height: 48,
+    paddingHorizontal: 12,
   },
-  inputIcon: {
-    marginLeft: SPACING.md,
+  inputIconBox: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   textInput: {
     flex: 1,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: Platform.OS === 'ios' ? SPACING.md : SPACING.sm + 2,
-    ...TYPOGRAPHY.xs,
-    color: COLORS.slate900,
+    height: '100%',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#111C24',
+    paddingVertical: 0,
   },
   eyeBtn: {
-    position: 'absolute',
-    right: SPACING.md,
-    padding: 4,
-  },
-  signInBtn: {
-    backgroundColor: COLORS.slate900,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    flexDirection: 'row',
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    marginTop: SPACING.xs,
-    ...SHADOWS.sm,
-  },
-  signInBtnText: {
-    ...TYPOGRAPHY.sm,
-    fontWeight: '800',
-    color: COLORS.white,
+    marginLeft: 4,
   },
   demoSection: {
-    marginTop: SPACING.lg,
+    marginTop: 16,
   },
   demoDividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 12,
   },
   demoDivider: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: '#EAE6DF',
   },
   demoDividerText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '800',
-    color: COLORS.slate400,
-    paddingHorizontal: SPACING.sm,
-    letterSpacing: 0.5,
+    color: '#94A3B8',
+    paddingHorizontal: 10,
+    letterSpacing: 0.6,
   },
   demoButtonsRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: 10,
   },
   demoBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.md,
+    paddingVertical: 9.5,
+    minHeight: 40,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 4,
+    gap: 5,
   },
   demoBtnPlant: {
-    backgroundColor: COLORS.plantBg,
-    borderColor: COLORS.plantBorder,
+    backgroundColor: '#ECF7F2',
+    borderColor: '#A7F3D0',
   },
   demoBtnDistributor: {
-    backgroundColor: COLORS.distributorBg,
-    borderColor: COLORS.distributorBorder,
+    backgroundColor: '#FAF7F2',
+    borderColor: '#E6D7C3',
   },
   demoBtnTextPlant: {
-    ...TYPOGRAPHY.xs,
-    fontWeight: '800',
-    color: COLORS.plantAccent,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#056B4A',
   },
   demoBtnTextDistributor: {
-    ...TYPOGRAPHY.xs,
-    fontWeight: '800',
-    color: COLORS.distributorAccent,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#111C24',
   },
   registerPrompt: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: SPACING.lg,
+    marginTop: 16,
     gap: 4,
   },
   registerPromptText: {
-    ...TYPOGRAPHY.xs,
-    color: COLORS.slate500,
+    fontSize: 12,
+    color: '#64748B',
   },
   registerLinkText: {
-    ...TYPOGRAPHY.xs,
+    fontSize: 12,
     fontWeight: '800',
-  },
-  footerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.lg,
-    gap: 6,
-  },
-  connectedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.success,
-  },
-  footerEndpointText: {
-    fontSize: 10,
-    fontFamily: 'monospace',
-    color: COLORS.slate400,
   },
 });
 

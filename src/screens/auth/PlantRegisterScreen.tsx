@@ -52,6 +52,7 @@ export function PlantRegisterScreen({ navigation }: any) {
   };
 
   const handleRegister = async () => {
+    if (loading) return;
     setError('');
     if (!phoneVerified) return setError('Please verify your phone number first');
     if (!fileUploaded) return setError('Please upload your plant label artwork');

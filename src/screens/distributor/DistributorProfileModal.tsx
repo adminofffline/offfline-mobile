@@ -4,10 +4,8 @@ import {
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
   ScrollView,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import {
   X,
@@ -20,6 +18,8 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
+import { NativePressable } from '../../components/common/NativePressable';
+import { AppleButton } from '../../components/common/AppleButton';
 
 interface DistributorProfileModalProps {
   visible: boolean;
@@ -33,15 +33,21 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
   const { user, updateProfile } = useAuth();
 
   const [companyName, setCompanyName] = useState(
-    user?.companyName || user?.organization || 'South Beverages Logistics'
+    user?.companyName || user?.organization || user?.fullName || 'Distributor Agency'
   );
-  const [ownerName, setOwnerName] = useState(user?.fullName || 'Ramesh Kumar');
+  const [ownerName, setOwnerName] = useState(user?.fullName || '');
   const [warehouseAddress, setWarehouseAddress] = useState(
-    user?.address || 'Godown #3, T. Nagar Hub, Chennai 600017'
+    user?.distributor_profile?.warehouse_address || user?.address || 'Chennai Facility'
   );
-  const [deliveryCapacity, setDeliveryCapacity] = useState('10,000 Cans/day');
-  const [bankAccount, setBankAccount] = useState('HDFC •••• 4410');
-  const [ifscCode, setIfscCode] = useState('HDFC0001234');
+  const [deliveryCapacity, setDeliveryCapacity] = useState(
+    user?.distributor_profile?.delivery_capacity || '10,000 Cans/day'
+  );
+  const [bankAccount, setBankAccount] = useState(
+    user?.distributor_profile?.account_no || ''
+  );
+  const [ifscCode, setIfscCode] = useState(
+    user?.distributor_profile?.ifsc_code || ''
+  );
 
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -91,9 +97,14 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
                 <Text style={styles.headerSubtitle}>Warehouse logistics & payout account</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <NativePressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              haptic="selection"
+              hitSlop={8}
+            >
               <X size={20} color={COLORS.slate400} />
-            </TouchableOpacity>
+            </NativePressable>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
@@ -169,21 +180,14 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.saveBtn}
+            <AppleButton
+              title="Save Distributor Profile"
+              variant="distributor"
+              size="md"
+              loading={isSaving}
               onPress={handleSave}
-              disabled={isSaving}
-              activeOpacity={0.8}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <>
-                  <Save size={16} color={COLORS.white} />
-                  <Text style={styles.saveBtnText}>Save Distributor Profile</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              icon={<Save size={16} color={COLORS.white} />}
+            />
           </View>
         </View>
       </View>
