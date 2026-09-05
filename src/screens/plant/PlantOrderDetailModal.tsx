@@ -153,12 +153,12 @@ export const PlantOrderDetailModal: React.FC<PlantOrderDetailModalProps> = ({
               <View style={styles.termsRow}>
                 <View style={styles.termBox}>
                   <Text style={styles.termLabel}>Plant Commission Rate</Text>
-                  <Text style={styles.termValue}>₹0.50 / bottle</Text>
+                  <Text style={styles.termValue}>₹10.00 / can</Text>
                 </View>
                 <View style={styles.termBox}>
                   <Text style={styles.termLabel}>Est. Total Payout</Text>
                   <Text style={[styles.termValue, { color: COLORS.plantAccent }]}>
-                    ₹{((order.quantityNum || 0) * 0.5).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ₹{((order.quantityNum || 0) * 10).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
               </View>
