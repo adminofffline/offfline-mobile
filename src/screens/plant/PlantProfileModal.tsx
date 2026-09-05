@@ -23,6 +23,8 @@ import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/th
 import { NativePressable } from '../../components/common/NativePressable';
 import { AppleButton } from '../../components/common/AppleButton';
 
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+
 interface PlantProfileModalProps {
   visible: boolean;
   onClose: () => void;
@@ -67,11 +69,10 @@ export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, o
         city: 'Chennai',
       });
 
-      setStatusMessage('✓ Facility specifications saved to live database!');
-      setTimeout(() => {
-        setStatusMessage(null);
-        onClose();
-      }, 1500);
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
+      onClose();
     } catch (e) {
       setStatusMessage('Failed to update plant profile');
     } finally {

@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { Clock, XCircle, LogOut } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
+import { NativePressable } from '../../components/common/NativePressable';
 
 export const WaitingForApprovalScreen: React.FC = () => {
   const { signOut } = useAuth();
@@ -19,10 +20,15 @@ export const WaitingForApprovalScreen: React.FC = () => {
             Your operator registration is currently pending Super Admin authorization. Once your license and compliance details are verified, you will gain full access.
           </Text>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
+          <NativePressable
+            style={styles.logoutBtn}
+            onPress={signOut}
+            haptic="impactMedium"
+            scaleActive={0.96}
+          >
             <LogOut size={16} color={COLORS.error} />
             <Text style={styles.logoutBtnText}>Sign Out</Text>
-          </TouchableOpacity>
+          </NativePressable>
         </View>
       </View>
     </SafeAreaView>
@@ -44,10 +50,15 @@ export const RegistrationRejectedScreen: React.FC = () => {
             {user?.rejectionReason || 'Your facility registration could not be verified in accordance with regulatory ISI and compliance standards.'}
           </Text>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
+          <NativePressable
+            style={styles.logoutBtn}
+            onPress={signOut}
+            haptic="impactMedium"
+            scaleActive={0.96}
+          >
             <LogOut size={16} color={COLORS.error} />
             <Text style={styles.logoutBtnText}>Sign Out</Text>
-          </TouchableOpacity>
+          </NativePressable>
         </View>
       </View>
     </SafeAreaView>

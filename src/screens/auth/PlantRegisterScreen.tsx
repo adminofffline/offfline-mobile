@@ -5,6 +5,8 @@ import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../constants/theme';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+
 export function PlantRegisterScreen({ navigation }: any) {
   const { signIn } = useAuth();
   
@@ -32,23 +34,29 @@ export function PlantRegisterScreen({ navigation }: any) {
 
   const handleSendOtp = () => {
     if (form.phone.length !== 10) return;
+    try {
+      ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+    } catch (e) {}
     setOtpSent(true);
   };
 
   const handleVerifyOtp = () => {
     if (otpCode.length === 6) {
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
       setPhoneVerified(true);
       setShowOtpModal(false);
     }
   };
 
   const handleMockUpload = () => {
-    setIsUploading(true);
-    setTimeout(() => {
-      setFileName('Plant_Label_Design.png (702x1063 px 2:7 Ratio verified)');
-      setFileUploaded(true);
-      setIsUploading(false);
-    }, 1500);
+    try {
+      ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+    } catch (e) {}
+    setFileName('Plant_Label_Design.png (702x1063 px 2:7 Ratio verified)');
+    setFileUploaded(true);
+    setIsUploading(false);
   };
 
   const handleRegister = async () => {

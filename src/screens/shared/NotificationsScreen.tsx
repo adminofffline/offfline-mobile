@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Bell, ArrowLeft, CheckCheck } from 'lucide-react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { notificationsApi } from '../../api/notifications';
+import apiCache from '../../api/cache';
 import { InAppNotification } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { formatDateShort } from '../../utils/formatters';
@@ -19,43 +21,64 @@ interface NotificationsScreenProps {
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation }) => {
-  const [notifications, setNotifications] = useState<InAppNotification[]>([]);
+  // 0ms instant cache hydration
+  const cachedNotifs = apiCache.get<any>('notifications_{}')?.data?.notifications || [];
+  const [notifications, setNotifications] = useState<InAppNotification[]>(
+    Array.isArray(cachedNotifs) ? cachedNotifs : []
+  );
   const [filter, setFilter] = useState<'ALL' | 'UNREAD'>('ALL');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Background non-blocking fetch / revalidation
   const loadNotifications = useCallback(async (forceRefresh = false) => {
-    setIsLoading(true);
+    if (forceRefresh) setIsRefreshing(true);
     try {
-      const res = await notificationsApi.getNotifications(
-        { unread_only: filter === 'UNREAD' },
-        forceRefresh
-      );
+      const res = await notificationsApi.getNotifications({}, forceRefresh);
       const list = res.data?.notifications || [];
       setNotifications(list);
     } catch (e) {
       console.warn('Failed to load notifications:', e);
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
+  // Instant 0ms client-side filter computation
+  const displayedNotifications = useMemo(() => {
+    if (filter === 'UNREAD') {
+      return notifications.filter((n) => !n.is_read);
+    }
+    return notifications;
+  }, [notifications, filter]);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter((n) => !n.is_read).length;
+  }, [notifications]);
+
+  // Optimistic 0ms read state update
   const handleMarkRead = async (id: string) => {
     try {
+      ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
+    } catch (e) {}
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
+    try {
       await notificationsApi.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
     } catch (e) {}
   };
 
   const handleMarkAllRead = async () => {
     try {
+      ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+    } catch (e) {}
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
       await notificationsApi.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch (e) {}
   };
 
@@ -86,7 +109,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
           </NativePressable>
         </View>
 
-        {/* Filter Tabs */}
+        {/* Filter Tabs - Instant 0ms response */}
         <View style={styles.tabRow}>
           <NativePressable
             style={[styles.tabBtn, filter === 'ALL' && styles.tabBtnActive]}
@@ -95,7 +118,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             scaleActive={0.96}
           >
             <Text style={[styles.tabBtnText, filter === 'ALL' && styles.tabBtnTextActive]}>
-              All Notifications
+              All Notifications ({notifications.length})
             </Text>
           </NativePressable>
 
@@ -106,17 +129,17 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             scaleActive={0.96}
           >
             <Text style={[styles.tabBtnText, filter === 'UNREAD' && styles.tabBtnTextActive]}>
-              Unread
+              Unread {unreadCount > 0 ? `(${unreadCount})` : ''}
             </Text>
           </NativePressable>
         </View>
 
         {/* Notifications List */}
         <FlatList
-          data={notifications}
+          data={displayedNotifications}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={() => loadNotifications(true)} />
+            <RefreshControl refreshing={isRefreshing} onRefresh={() => loadNotifications(true)} />
           }
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (

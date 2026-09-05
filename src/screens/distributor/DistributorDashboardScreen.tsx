@@ -1740,13 +1740,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
       />
 
       {/* ── MODAL 2: EDIT DISTRIBUTOR PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
-      <Modal
-        visible={showProfileModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowProfileModal(false)}
-      >
-        {showProfileModal && (
+      {showProfileModal && (
+        <Modal
+          visible={true}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowProfileModal(false)}
+        >
           <View style={styles.centerModalOverlay}>
           <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
             <View style={StyleSheet.absoluteFillObject} />
@@ -1930,8 +1930,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
               </View>
             </View>
           </View>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── 3. USER MENU (Anchored Directly Below Top Bar) ── */}
       {showUserMenu && (
@@ -1990,13 +1990,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
       )}
 
       {/* ── MODAL 4: CHANGE PASSWORD (Apple Themed Redesign) ── */}
-      <Modal
-        visible={showChangePasswordModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowChangePasswordModal(false)}
-      >
-        {showChangePasswordModal && (
+      {showChangePasswordModal && (
+        <Modal
+          visible={true}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowChangePasswordModal(false)}
+        >
           <View style={styles.centerModalOverlay}>
           <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
             <View style={StyleSheet.absoluteFillObject} />
@@ -2070,8 +2070,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
             </NativePressable>
           </View>
         </View>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── MODAL 5: SCAN DELIVERY DETAILS (Apple Popped Bottom Sheet) ── */}
       {currentRecord && (

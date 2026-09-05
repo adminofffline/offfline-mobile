@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   RefreshControl,
   SafeAreaView,
   TextInput,
@@ -20,16 +19,23 @@ import {
   X,
   Layers,
 } from 'lucide-react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { plantApi } from '../../api/plant';
+import apiCache from '../../api/cache';
 import { PlantDailyOutputEntry } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { UserMenuModal } from '../../components/UserMenuModal';
 import { PlantProfileModal } from './PlantProfileModal';
+import { NativePressable } from '../../components/common/NativePressable';
 
 export const PlantOutputScreen: React.FC = () => {
-  const [entries, setEntries] = useState<PlantDailyOutputEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const cachedEntries = apiCache.get<any>('manufacturer_output')?.data?.entries || [];
+
+  const [entries, setEntries] = useState<PlantDailyOutputEntry[]>(
+    Array.isArray(cachedEntries) ? cachedEntries : []
+  );
+  const [loading, setLoading] = useState(entries.length === 0);
   const [showLogModal, setShowLogModal] = useState(false);
 
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
@@ -41,10 +47,12 @@ export const PlantOutputScreen: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (forceRefresh = false) => {
+    if (entries.length === 0 || forceRefresh) {
+      setLoading(true);
+    }
     try {
-      const res = await plantApi.getOutput().catch(() => null);
+      const res = await plantApi.getOutput(forceRefresh).catch(() => null);
       const list = res?.data?.entries || res?.data;
       if (Array.isArray(list)) {
         setEntries(list);
@@ -54,7 +62,7 @@ export const PlantOutputScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [entries.length]);
 
   useEffect(() => {
     loadData();
@@ -73,6 +81,10 @@ export const PlantOutputScreen: React.FC = () => {
         batch_notes: formNotes || null,
         status: 'VERIFIED',
       };
+
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
 
       await plantApi.saveOutput({
         date: formDate,
@@ -133,14 +145,15 @@ export const PlantOutputScreen: React.FC = () => {
             {/* Action Bar */}
             <View style={styles.actionRow}>
               <Text style={styles.sectionTitle}>Shift Output Records</Text>
-              <TouchableOpacity
+              <NativePressable
                 style={styles.logBtn}
                 onPress={() => setShowLogModal(true)}
-                activeOpacity={0.8}
+                haptic="impactLight"
+                scaleActive={0.96}
               >
                 <Plus size={14} color={COLORS.white} />
                 <Text style={styles.logBtnText}>Log Today's Output</Text>
-              </TouchableOpacity>
+              </NativePressable>
             </View>
           </View>
         }
@@ -182,92 +195,104 @@ export const PlantOutputScreen: React.FC = () => {
       />
 
       {/* Log Output Modal */}
-      <Modal visible={showLogModal} transparent animationType="slide" onRequestClose={() => setShowLogModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleRow}>
-                <Droplets size={20} color={COLORS.plantAccent} />
-                <Text style={styles.modalTitle}>Log Daily Bottling Output</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowLogModal(false)} style={styles.closeBtn}>
-                <X size={18} color={COLORS.slate400} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.formBody}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PRODUCTION DATE (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={formDate}
-                  onChangeText={setFormDate}
-                />
+      {showLogModal && (
+        <Modal visible={true} transparent animationType="slide" onRequestClose={() => setShowLogModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleRow}>
+                  <Droplets size={20} color={COLORS.plantAccent} />
+                  <Text style={styles.modalTitle}>Log Daily Bottling Output</Text>
+                </View>
+                <NativePressable
+                  onPress={() => setShowLogModal(false)}
+                  style={styles.closeBtn}
+                  haptic="selection"
+                  hitSlop={8}
+                >
+                  <X size={18} color={COLORS.slate400} />
+                </NativePressable>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CANS FILLED (UNITS) *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. 24500"
-                  placeholderTextColor={COLORS.slate400}
-                  keyboardType="numeric"
-                  value={formCansFilled}
-                  onChangeText={setFormCansFilled}
-                />
-              </View>
+              <View style={styles.formBody}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>PRODUCTION DATE (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formDate}
+                    onChangeText={setFormDate}
+                  />
+                </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>AD SLEEVES APPLIED *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. 24500"
-                  placeholderTextColor={COLORS.slate400}
-                  keyboardType="numeric"
-                  value={formStickersApplied}
-                  onChangeText={setFormStickersApplied}
-                />
-              </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>CANS FILLED (UNITS) *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 24500"
+                    placeholderTextColor={COLORS.slate400}
+                    keyboardType="numeric"
+                    value={formCansFilled}
+                    onChangeText={setFormCansFilled}
+                  />
+                </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PRODUCTION SHIFT NOTES</Text>
-                <TextInput
-                  style={[styles.textInput, { height: 60, textAlignVertical: 'top' }]}
-                  placeholder="Shift A & B run at rate..."
-                  placeholderTextColor={COLORS.slate400}
-                  value={formNotes}
-                  onChangeText={setFormNotes}
-                  multiline
-                />
-              </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>AD SLEEVES APPLIED *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 24500"
+                    placeholderTextColor={COLORS.slate400}
+                    keyboardType="numeric"
+                    value={formStickersApplied}
+                    onChangeText={setFormStickersApplied}
+                  />
+                </View>
 
-              <TouchableOpacity
-                style={styles.submitBtn}
-                onPress={handleAddEntry}
-                disabled={isSaving || !formCansFilled || !formStickersApplied}
-                activeOpacity={0.8}
-              >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.submitBtnText}>Save Shift Output Log</Text>
-                )}
-              </TouchableOpacity>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>PRODUCTION SHIFT NOTES</Text>
+                  <TextInput
+                    style={[styles.textInput, { height: 60, textAlignVertical: 'top' }]}
+                    placeholder="Shift A & B run at rate..."
+                    placeholderTextColor={COLORS.slate400}
+                    value={formNotes}
+                    onChangeText={setFormNotes}
+                    multiline
+                  />
+                </View>
+
+                <NativePressable
+                  style={styles.submitBtn}
+                  onPress={handleAddEntry}
+                  disabled={isSaving || !formCansFilled || !formStickersApplied}
+                  haptic="impactMedium"
+                  scaleActive={0.98}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Save Shift Output Log</Text>
+                  )}
+                </NativePressable>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
-      <UserMenuModal
-        visible={showUserMenu}
-        onClose={() => setShowUserMenu(false)}
-        onOpenProfile={() => setShowProfileModal(true)}
-      />
+      {showUserMenu && (
+        <UserMenuModal
+          visible={true}
+          onClose={() => setShowUserMenu(false)}
+          onOpenProfile={() => setShowProfileModal(true)}
+        />
+      )}
 
-      <PlantProfileModal
-        visible={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-      />
+      {showProfileModal && (
+        <PlantProfileModal
+          visible={true}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };

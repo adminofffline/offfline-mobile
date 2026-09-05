@@ -2039,13 +2039,13 @@ export function PlantDashboardScreen({ navigation }: any) {
       />
 
       {/* ── MODAL 2: LOCATION PICKER (Apple Themed Redesign) ── */}
-      <Modal
-        visible={showLocationPicker}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowLocationPicker(false)}
-      >
-        {showLocationPicker && (
+      {showLocationPicker && (
+        <Modal
+          visible={true}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowLocationPicker(false)}
+        >
           <View style={styles.centerModalOverlay}>
             <TouchableWithoutFeedback onPress={() => setShowLocationPicker(false)}>
               <View style={StyleSheet.absoluteFillObject} />
@@ -2082,17 +2082,17 @@ export function PlantDashboardScreen({ navigation }: any) {
               </ScrollView>
             </View>
           </View>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── MODAL 3: EDIT PLANT FACILITY PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
-      <Modal
-        visible={showProfileModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowProfileModal(false)}
-      >
-        {showProfileModal && (
+      {showProfileModal && (
+        <Modal
+          visible={true}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowProfileModal(false)}
+        >
           <View style={styles.centerModalOverlay}>
             <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
               <View style={StyleSheet.absoluteFillObject} />
@@ -2195,8 +2195,8 @@ export function PlantDashboardScreen({ navigation }: any) {
               </View>
             </View>
           </View>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── 4. USER ACCOUNT MENU (Anchored Directly Below Top Bar) ── */}
       {showUserMenu && (
@@ -2255,13 +2255,13 @@ export function PlantDashboardScreen({ navigation }: any) {
       )}
 
       {/* ── MODAL 5: CHANGE PASSWORD (Apple Themed Redesign) ── */}
-      <Modal
-        visible={showChangePasswordModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowChangePasswordModal(false)}
-      >
-        {showChangePasswordModal && (
+      {showChangePasswordModal && (
+        <Modal
+          visible={true}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowChangePasswordModal(false)}
+        >
           <View style={styles.centerModalOverlay}>
             <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
               <View style={StyleSheet.absoluteFillObject} />
@@ -2335,8 +2335,8 @@ export function PlantDashboardScreen({ navigation }: any) {
               </NativePressable>
             </View>
           </View>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── MODAL 5: ORDER DETAILS (Apple Popped Bottom Sheet) ── */}
       {currentDetailOrder && (

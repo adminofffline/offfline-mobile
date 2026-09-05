@@ -4,6 +4,7 @@ import { ArrowLeft, Truck, Check } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../constants/theme';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 export function DistributorRegisterScreen({ navigation }: any) {
   const { signIn } = useAuth();
@@ -27,11 +28,17 @@ export function DistributorRegisterScreen({ navigation }: any) {
 
   const handleSendOtp = () => {
     if (form.phone.length !== 10) return;
+    try {
+      ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+    } catch (e) {}
     setOtpSent(true);
   };
 
   const handleVerifyOtp = () => {
     if (otpCode.length === 6) {
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
       setPhoneVerified(true);
       setShowOtpModal(false);
     }

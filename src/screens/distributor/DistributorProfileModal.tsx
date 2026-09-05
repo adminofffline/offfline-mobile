@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { NativePressable } from '../../components/common/NativePressable';
 import { AppleButton } from '../../components/common/AppleButton';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 interface DistributorProfileModalProps {
   visible: boolean;
@@ -33,20 +34,20 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
   const { user, updateProfile } = useAuth();
 
   const [companyName, setCompanyName] = useState(
-    user?.companyName || user?.organization || user?.fullName || 'Distributor Agency'
+    user?.companyName || (user as any)?.organization || user?.fullName || 'Beverage Distribution Hub'
   );
-  const [ownerName, setOwnerName] = useState(user?.fullName || '');
+  const [ownerName, setOwnerName] = useState(user?.fullName || 'Distributor Operations');
   const [warehouseAddress, setWarehouseAddress] = useState(
-    user?.distributor_profile?.warehouse_address || user?.address || 'Chennai Facility'
+    user?.address || user?.distributor_profile?.warehouse_address || 'Central Distribution Warehouse, Chennai'
   );
   const [deliveryCapacity, setDeliveryCapacity] = useState(
-    user?.distributor_profile?.delivery_capacity || '10,000 Cans/day'
+    user?.distributor_profile?.delivery_capacity ? `${user.distributor_profile.delivery_capacity} cans/day` : '20,000 cans/day'
   );
   const [bankAccount, setBankAccount] = useState(
-    user?.distributor_profile?.account_no || ''
+    user?.distributor_profile?.account_no || '987654321098'
   );
   const [ifscCode, setIfscCode] = useState(
-    user?.distributor_profile?.ifsc_code || ''
+    user?.distributor_profile?.ifsc_code || 'HDFC0001234'
   );
 
   const [isSaving, setIsSaving] = useState(false);
@@ -69,11 +70,10 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
         },
       });
 
-      setStatusMessage('✓ Distributor profile saved to live database!');
-      setTimeout(() => {
-        setStatusMessage(null);
-        onClose();
-      }, 1500);
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
+      onClose();
     } catch (e) {
       setStatusMessage('Failed to update distributor profile');
     } finally {

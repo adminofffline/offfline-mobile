@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   RefreshControl,
   SafeAreaView,
   TextInput,
@@ -19,33 +18,43 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { plantApi } from '../../api/plant';
+import apiCache from '../../api/cache';
 import { PlantBatchItem } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Header } from '../../components/Header';
 import { UserMenuModal } from '../../components/UserMenuModal';
 import { PlantProfileModal } from './PlantProfileModal';
+import { NativePressable } from '../../components/common/NativePressable';
 
 export const PlantBatchesScreen: React.FC = () => {
   const { user } = useAuth();
-  const [batches, setBatches] = useState<PlantBatchItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  // Instant 0ms hydration from cache
+  const cachedBatches = apiCache.get<any>('manufacturer_batches')?.data?.batches || [];
+  const cachedProfile = apiCache.get<any>(`plant_profile_${user?._id || 'me'}`)?.data?.profile?.plant_profile;
+
+  const [batches, setBatches] = useState<PlantBatchItem[]>(cachedBatches);
+  const [loading, setLoading] = useState(cachedBatches.length === 0);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [capacityMessage, setCapacityMessage] = useState<string | null>(null);
 
-  const [minCapacity, setMinCapacity] = useState('500');
-  const [maxCapacity, setMaxCapacity] = useState('50000');
-  const [hasInhousePrinter, setHasInhousePrinter] = useState(false);
+  const [minCapacity, setMinCapacity] = useState(String(cachedProfile?.min_capacity || 500));
+  const [maxCapacity, setMaxCapacity] = useState(String(cachedProfile?.max_capacity || 50000));
+  const [hasInhousePrinter, setHasInhousePrinter] = useState(Boolean(cachedProfile?.has_inhouse_printer));
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (forceRefresh = false) => {
+    if (batches.length === 0 || forceRefresh) {
+      setLoading(true);
+    }
     try {
-      const profRes = await plantApi.getProfile().catch(() => null);
+      const profRes = await plantApi.getProfile(user?._id, forceRefresh).catch(() => null);
       if (profRes?.data?.profile?.plant_profile) {
         const p = profRes.data.profile.plant_profile;
         setMinCapacity(String(p.min_capacity || 500));
@@ -53,7 +62,7 @@ export const PlantBatchesScreen: React.FC = () => {
         setHasInhousePrinter(Boolean(p.has_inhouse_printer));
       }
 
-      const res = await plantApi.getBatches().catch(() => null);
+      const res = await plantApi.getBatches(forceRefresh).catch(() => null);
       const list = res?.data?.batches || [];
       setBatches(list);
     } catch (e) {
@@ -61,7 +70,7 @@ export const PlantBatchesScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [batches.length, user?._id]);
 
   useEffect(() => {
     loadData();
@@ -77,8 +86,10 @@ export const PlantBatchesScreen: React.FC = () => {
         has_inhouse_printer: hasInhousePrinter,
         city: 'Chennai',
       });
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
       setCapacityMessage('✓ Water Plant capacity & labeling capability updated!');
-      setTimeout(() => setCapacityMessage(null), 3000);
     } catch (err: any) {
       setCapacityMessage('Failed to update capacity profile');
     } finally {
@@ -136,10 +147,11 @@ export const PlantBatchesScreen: React.FC = () => {
                 </View>
               </View>
 
-              <TouchableOpacity
+              <NativePressable
                 style={styles.checkboxRow}
                 onPress={() => setHasInhousePrinter(!hasInhousePrinter)}
-                activeOpacity={0.8}
+                haptic="selection"
+                scaleActive={0.98}
               >
                 <View style={[styles.checkbox, hasInhousePrinter && styles.checkboxActive]}>
                   {hasInhousePrinter && <CheckCircle2 size={12} color={COLORS.white} />}
@@ -148,13 +160,14 @@ export const PlantBatchesScreen: React.FC = () => {
                   <Text style={styles.checkboxLabel}>Has In-House Label Printer</Text>
                   <Text style={styles.checkboxSub}>Applies shrink sleeves on plant site</Text>
                 </View>
-              </TouchableOpacity>
+              </NativePressable>
 
-              <TouchableOpacity
+              <NativePressable
                 style={styles.saveBtn}
                 onPress={handleSaveCapacity}
                 disabled={savingCapacity}
-                activeOpacity={0.8}
+                haptic="impactMedium"
+                scaleActive={0.98}
               >
                 {savingCapacity ? (
                   <ActivityIndicator size="small" color={COLORS.white} />
@@ -164,7 +177,7 @@ export const PlantBatchesScreen: React.FC = () => {
                     <Text style={styles.saveBtnText}>Update Capacity</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </NativePressable>
             </View>
 
             <View style={styles.sectionDivider}>
@@ -197,16 +210,20 @@ export const PlantBatchesScreen: React.FC = () => {
         }
       />
 
-      <UserMenuModal
-        visible={showUserMenu}
-        onClose={() => setShowUserMenu(false)}
-        onOpenProfile={() => setShowProfileModal(true)}
-      />
+      {showUserMenu && (
+        <UserMenuModal
+          visible={true}
+          onClose={() => setShowUserMenu(false)}
+          onOpenProfile={() => setShowProfileModal(true)}
+        />
+      )}
 
-      <PlantProfileModal
-        visible={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-      />
+      {showProfileModal && (
+        <PlantProfileModal
+          visible={true}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };

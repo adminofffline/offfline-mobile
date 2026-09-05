@@ -23,10 +23,12 @@ import {
   Factory,
   Truck,
 } from 'lucide-react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/auth';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import { CONFIG } from '../constants/config';
+import { NativePressable } from './common/NativePressable';
 
 interface UserMenuModalProps {
   visible: boolean;
@@ -70,14 +72,15 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
         current_password: currentPassword,
         new_password: newPassword,
       });
-      setPasswordStatus({ type: 'success', message: 'Password updated successfully!' });
+      try {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+      } catch (e) {}
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        setPasswordStatus(null);
-      }, 2000);
+      setShowPasswordModal(false);
+      setPasswordStatus(null);
+      onClose();
     } catch (err: any) {
       setPasswordStatus({
         type: 'error',
@@ -87,6 +90,10 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
       setIsUpdatingPassword(false);
     }
   };
+
+  if (!visible && !showPasswordModal) {
+    return null;
+  }
 
   return (
     <>
@@ -118,21 +125,27 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
                       </Text>
                     </View>
                   </View>
-                  <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                  <NativePressable
+                    onPress={onClose}
+                    style={styles.closeBtn}
+                    haptic="selection"
+                    hitSlop={8}
+                  >
                     <X size={18} color={COLORS.slate400} />
-                  </TouchableOpacity>
+                  </NativePressable>
                 </View>
 
                 {/* Actions List */}
                 <View style={styles.menuItems}>
                   {onOpenProfile && (
-                    <TouchableOpacity
+                    <NativePressable
                       style={styles.menuItem}
                       onPress={() => {
                         onClose();
                         onOpenProfile();
                       }}
-                      activeOpacity={0.7}
+                      haptic="impactLight"
+                      scaleActive={0.98}
                     >
                       <View style={styles.menuItemIcon}>
                         <Building2 size={18} color={COLORS.slate700} />
@@ -145,13 +158,14 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
                           {isPlant ? 'ISI certificates & bottling specs' : 'Warehouse & tax details'}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </NativePressable>
                   )}
 
-                  <TouchableOpacity
+                  <NativePressable
                     style={styles.menuItem}
                     onPress={() => setShowPasswordModal(true)}
-                    activeOpacity={0.7}
+                    haptic="impactLight"
+                    scaleActive={0.98}
                   >
                     <View style={styles.menuItemIcon}>
                       <Key size={18} color={COLORS.slate700} />
@@ -160,7 +174,7 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
                       <Text style={styles.menuItemTitle}>Security & Password</Text>
                       <Text style={styles.menuItemSubtitle}>Update terminal access password</Text>
                     </View>
-                  </TouchableOpacity>
+                  </NativePressable>
 
                   <View style={styles.serverInfoRow}>
                     <Text style={styles.serverInfoLabel}>Connected Endpoint</Text>
@@ -170,17 +184,18 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
                   </View>
 
                   {/* Sign Out Button */}
-                  <TouchableOpacity
+                  <NativePressable
                     style={styles.signOutBtn}
                     onPress={() => {
                       onClose();
                       signOut();
                     }}
-                    activeOpacity={0.8}
+                    haptic="impactMedium"
+                    scaleActive={0.98}
                   >
                     <LogOut size={16} color={COLORS.error} />
                     <Text style={styles.signOutText}>Sign Out from Terminal</Text>
-                  </TouchableOpacity>
+                  </NativePressable>
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -189,98 +204,106 @@ export const UserMenuModal: React.FC<UserMenuModalProps> = ({
       </Modal>
 
       {/* Change Password Modal */}
-      <Modal visible={showPasswordModal} transparent animationType="slide" onRequestClose={() => setShowPasswordModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.passwordCard}>
-            <View style={styles.passwordCardHeader}>
-              <View style={styles.keyIconCircle}>
-                <Key size={20} color={COLORS.slate900} />
+      {showPasswordModal && (
+        <Modal visible={true} transparent animationType="slide" onRequestClose={() => setShowPasswordModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.passwordCard}>
+              <View style={styles.passwordCardHeader}>
+                <View style={styles.keyIconCircle}>
+                  <Key size={20} color={COLORS.slate900} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.passwordCardTitle}>Change Password</Text>
+                  <Text style={styles.passwordCardSubtitle}>Enter your current and new password</Text>
+                </View>
+                <NativePressable
+                  onPress={() => setShowPasswordModal(false)}
+                  style={styles.closeBtn}
+                  haptic="selection"
+                  hitSlop={8}
+                >
+                  <X size={18} color={COLORS.slate400} />
+                </NativePressable>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.passwordCardTitle}>Change Password</Text>
-                <Text style={styles.passwordCardSubtitle}>Enter your current and new password</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowPasswordModal(false)} style={styles.closeBtn}>
-                <X size={18} color={COLORS.slate400} />
-              </TouchableOpacity>
-            </View>
 
-            {passwordStatus && (
-              <View
-                style={[
-                  styles.statusAlert,
-                  passwordStatus.type === 'success' ? styles.statusAlertSuccess : styles.statusAlertError,
-                ]}
-              >
-                {passwordStatus.type === 'success' ? (
-                  <CheckCircle2 size={16} color={COLORS.success} />
-                ) : (
-                  <AlertCircle size={16} color={COLORS.error} />
-                )}
-                <Text
+              {passwordStatus && (
+                <View
                   style={[
-                    styles.statusAlertText,
-                    passwordStatus.type === 'success' ? { color: COLORS.successText } : { color: COLORS.errorText },
+                    styles.statusAlert,
+                    passwordStatus.type === 'success' ? styles.statusAlertSuccess : styles.statusAlertError,
                   ]}
                 >
-                  {passwordStatus.message}
-                </Text>
-              </View>
-            )}
+                  {passwordStatus.type === 'success' ? (
+                    <CheckCircle2 size={16} color={COLORS.success} />
+                  ) : (
+                    <AlertCircle size={16} color={COLORS.error} />
+                  )}
+                  <Text
+                    style={[
+                      styles.statusAlertText,
+                      passwordStatus.type === 'success' ? { color: COLORS.successText } : { color: COLORS.errorText },
+                    ]}
+                  >
+                    {passwordStatus.message}
+                  </Text>
+                </View>
+              )}
 
-            <View style={styles.passwordForm}>
-              <View>
-                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-                <TextInput
-                  style={styles.textInput}
-                  secureTextEntry
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.slate400}
-                />
-              </View>
+              <View style={styles.passwordForm}>
+                <View>
+                  <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    secureTextEntry
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={COLORS.slate400}
+                  />
+                </View>
 
-              <View>
-                <Text style={styles.inputLabel}>NEW PASSWORD (MIN. 6 CHARACTERS)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.slate400}
-                />
-              </View>
+                <View>
+                  <Text style={styles.inputLabel}>NEW PASSWORD (MIN. 6 CHARACTERS)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    secureTextEntry
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={COLORS.slate400}
+                  />
+                </View>
 
-              <View>
-                <Text style={styles.inputLabel}>CONFIRM NEW PASSWORD</Text>
-                <TextInput
-                  style={styles.textInput}
-                  secureTextEntry
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.slate400}
-                />
-              </View>
+                <View>
+                  <Text style={styles.inputLabel}>CONFIRM NEW PASSWORD</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    secureTextEntry
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="••••••••"
+                    placeholderTextColor={COLORS.slate400}
+                  />
+                </View>
 
-              <TouchableOpacity
-                style={styles.savePasswordBtn}
-                onPress={handleUpdatePassword}
-                disabled={isUpdatingPassword}
-                activeOpacity={0.8}
-              >
-                {isUpdatingPassword ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.savePasswordBtnText}>Update Password</Text>
-                )}
-              </TouchableOpacity>
+                <NativePressable
+                  style={styles.savePasswordBtn}
+                  onPress={handleUpdatePassword}
+                  disabled={isUpdatingPassword}
+                  haptic="impactMedium"
+                  scaleActive={0.98}
+                >
+                  {isUpdatingPassword ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.savePasswordBtnText}>Update Password</Text>
+                  )}
+                </NativePressable>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 };
