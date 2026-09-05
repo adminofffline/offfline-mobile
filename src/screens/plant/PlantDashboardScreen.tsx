@@ -2104,9 +2104,43 @@ export function PlantDashboardScreen({ navigation }: any) {
             const displayTitle = formatCampaignTitle(selectedSettlementModal.campaignTitle);
             const handleShareStatement = () => {
               ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
+              const dateStr = selectedSettlementModal.deliveryDate || new Date().toISOString().split('T')[0];
+              const timeStr = selectedSettlementModal.deliveryTime || '10:30 AM';
+              const statusText = isSettled ? 'SETTLED VIA BANKING ✓' : 'PENDING EOD SETTLEMENT';
+              const formattedCommission = selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+              const message = [
+                '========================================',
+                '       OFFFLINE SETTLEMENT STATEMENT    ',
+                '========================================',
+                `Ref ID:       ${selectedSettlementModal.id}`,
+                `Date:         ${dateStr}, ${timeStr}`,
+                `Facility:     ${selectedSettlementModal.locationTitle || 'Bottling Facility'}`,
+                `Status:       ${statusText}`,
+                '----------------------------------------',
+                'BATCH & BOTTLING SPECIFICATIONS',
+                `Campaign:     ${displayTitle}`,
+                `Brand:        ${selectedSettlementModal.brandName}`,
+                `SAC Code:     998361 (Water Media Advertising)`,
+                `Volume:       ${selectedSettlementModal.bottlesCount.toLocaleString('en-IN')} × 20L Water Cans`,
+                `Plant Rate:   ₹10.00 / Can`,
+                '----------------------------------------',
+                'FINANCIAL SETTLEMENT BREAKDOWN',
+                `Gross Value:  ₹${formattedCommission}`,
+                `TDS (2%):     Auto-Reconciled`,
+                '----------------------------------------',
+                `NET DISBURSED PAYOUT:  +₹${formattedCommission}`,
+                '----------------------------------------',
+                'NODE & AUDIT TELEMETRY',
+                `GPS Telemetry: ${selectedSettlementModal.gpsCoords || '13.0827° N, 80.2707° E'}`,
+                `Node Server:  ${selectedSettlementModal.ipAddress || '127.0.0.1'}`,
+                'Verification: Cryptographically Verified ✓',
+                '========================================',
+                'Generated via Offfline Smart Logistics Platform',
+              ].join('\n');
+
               Share.share({
                 title: `Settlement Statement - ${selectedSettlementModal.id}`,
-                message: `Offfline Settlement Statement & Audit\nRef ID: ${selectedSettlementModal.id}\nCampaign: ${displayTitle}\nBrand: ${selectedSettlementModal.brandName}\nNet Disbursed Payout: ₹${selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nVerified Bottling Output: ${selectedSettlementModal.bottlesCount.toLocaleString('en-IN')} × 20L Water Cans\nGuaranteed Scanning Rate: ₹10.00 / Can\nAssigned Facility: ${selectedSettlementModal.locationTitle || 'Bottling Facility'}\nGPS Telemetry: ${selectedSettlementModal.gpsCoords || '13.0827° N, 80.2707° E'}\nStatus: ${isSettled ? 'Settled via Banking' : 'Pending EOD Settlement'}`,
+                message,
               });
             };
 
@@ -2138,11 +2172,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                   </NativePressable>
                 </View>
 
-                <ScrollView
-                  style={styles.statementModalScroll}
-                  contentContainerStyle={styles.statementModalScrollContent}
-                  showsVerticalScrollIndicator={false}
-                >
+                <View style={styles.statementModalBody}>
                   {/* Hero Amount Card */}
                   <View style={styles.statementHeroCard}>
                     <Text style={styles.statementHeroLabel}>NET DISBURSED PAYOUT</Text>
@@ -2231,7 +2261,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                       <Text style={[styles.statementSpecValueBold, { color: '#059669' }]}>Cryptographically Verified ✓</Text>
                     </View>
                   </View>
-                </ScrollView>
+                </View>
 
                 {/* Bottom Action Row (Pinned & Guaranteed Full Height) */}
                 <View style={styles.statementBottomActionRow}>
@@ -3146,12 +3176,8 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 1,
   },
-  statementModalScroll: {
-    maxHeight: Math.min(320, Dimensions.get('window').height * 0.42),
-  },
-  statementModalScrollContent: {
+  statementModalBody: {
     gap: 10,
-    paddingBottom: 4,
   },
   statementHeroCard: {
     backgroundColor: '#F8FAFC',
