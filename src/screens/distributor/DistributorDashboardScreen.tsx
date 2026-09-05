@@ -514,7 +514,9 @@ const DistributorSettlementCardItem = React.memo(({
 }) => {
   const isSettled = record.settlementStatus === 'SETTLED';
   const displayTitle = formatCampaignTitle(record.campaignTitle);
-  const formattedAmount = `+₹${record.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const commVal = Number(record?.commission) || 0;
+  const bottlesVal = Number(record?.bottlesCount) || 0;
+  const formattedAmount = `+₹${commVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <View style={[styles.settlementCardContainer, isExpanded && styles.settlementCardContainerExpanded]}>
@@ -581,7 +583,7 @@ const DistributorSettlementCardItem = React.memo(({
             <View style={styles.settlementSpecGridRow}>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>VOLUME</Text>
-                <Text style={styles.settlementSpecVal}>{record.bottlesCount.toLocaleString('en-IN')} Cans (20L)</Text>
+                <Text style={styles.settlementSpecVal}>{bottlesVal.toLocaleString('en-IN')} Cans (20L)</Text>
               </View>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>DELIVERY RATE</Text>
@@ -628,8 +630,10 @@ interface DateSettlementGroup {
 
 const groupSettlementsByDate = (records: SettlementRecord[]): DateSettlementGroup[] => {
   const groupsMap = new Map<string, { totalIncome: number; settlements: SettlementRecord[] }>();
+  if (!Array.isArray(records)) return [];
 
   records.forEach((record) => {
+    if (!record) return;
     const rawDate = (record.deliveryDate || 'Recent').trim();
     const existing = groupsMap.get(rawDate);
     const amt = Number(record.commission) || 0;
