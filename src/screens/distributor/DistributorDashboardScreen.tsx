@@ -157,6 +157,15 @@ const RupeeBadgeIcon = ({ size = 20, color = '#7C3AED' }: { size?: number; color
   </Svg>
 );
 
+const cleanLocationDisplay = (loc?: string): string => {
+  if (!loc) return 'Chennai';
+  return String(loc)
+    .replace(/\s*\(undefined\)/gi, '')
+    .replace(/\s*undefined/gi, '')
+    .replace(/,\s*,/g, ',')
+    .trim() || 'Chennai';
+};
+
 // ── Apple Shimmer Skeleton Block ──
 const ShimmerBlock: React.FC<{ style?: any; borderRadius?: number }> = ({
   style,
@@ -450,7 +459,7 @@ const DistributorScanCardItem = React.memo(({
         <View style={styles.scanCardTextWrap}>
           <Text style={styles.scanCanId}>{scan.can_id}</Text>
           <Text style={styles.scanCampaignSub} numberOfLines={1}>
-            {scan.campaign_title} • {scan.location_name}
+            {scan.campaign_title} • {cleanLocationDisplay(scan.location_name)}
           </Text>
         </View>
       </View>
@@ -500,7 +509,7 @@ const DistributorSettlementCardItem = React.memo(({
             {displayTitle}
           </Text>
           <Text style={styles.settlementCardSub} numberOfLines={1}>
-            {record.brandName || 'Logistics Partner'} • {record.locationTitle || 'Distribution Hub'}
+            {record.brandName || 'Logistics Partner'} • {cleanLocationDisplay(record.locationTitle || 'Distribution Hub')}
           </Text>
         </View>
 
@@ -521,7 +530,7 @@ const DistributorSettlementCardItem = React.memo(({
         <View style={styles.settlementAccordionContent}>
           {/* Reference ID & Status */}
           <View style={styles.settlementAccordionHeaderRow}>
-            <Text style={styles.settlementAccordionRefText}>
+            <Text style={styles.settlementAccordionRefText} numberOfLines={1}>
               Ref: <Text style={styles.settlementAccordionRefMono}>{record.id}</Text>
             </Text>
             <View
@@ -565,7 +574,7 @@ const DistributorSettlementCardItem = React.memo(({
             <View style={styles.settlementSpecGridRow}>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>HUB</Text>
-                <Text style={styles.settlementSpecVal} numberOfLines={1}>{record.locationTitle || 'Distribution Hub'}</Text>
+                <Text style={styles.settlementSpecVal} numberOfLines={1}>{cleanLocationDisplay(record.locationTitle || 'Distribution Hub')}</Text>
               </View>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>SETTLEMENT TIME</Text>
@@ -1706,154 +1715,154 @@ export function DistributorDashboardScreen({ navigation }: any) {
           visible={Boolean(selectedRecord)}
           onClose={() => setSelectedRecord(null)}
         >
-          {({ close }) => (
-            <View style={styles.bottomSheetCard}>
-              {/* Specular Shine Overlay */}
-              <View style={styles.sheetCardSpecularShine} pointerEvents="none" />
+          {({ close }) => {
+            const isDuplicate = currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE';
+            return (
+              <View style={styles.bottomSheetCard}>
+                {/* Specular Shine Overlay */}
+                <View style={styles.sheetCardSpecularShine} pointerEvents="none" />
 
-              {/* Drag Indicator Handle Touch Area */}
-              <View style={styles.sheetHandleTouchArea}>
-                <View style={styles.sheetHandleIndicator} />
-              </View>
+                {/* Drag Indicator Handle Touch Area */}
+                <View style={styles.sheetHandleTouchArea}>
+                  <View style={styles.sheetHandleIndicator} />
+                </View>
 
-              {/* Header: Squircle Icon + Title/Sub */}
-              <View style={styles.sheetHeaderRow}>
-                <View style={styles.sheetHeaderLeft}>
-                  <View style={styles.sheetHeaderIconSquircle}>
-                    <BottleBadgeIcon size={22} color="#111C24" />
-                  </View>
-                  <View style={styles.sheetHeaderTitleWrap}>
-                    <Text style={styles.sheetHeaderTitle} numberOfLines={1}>
-                      {currentRecord.can_id}
-                    </Text>
-                    <View style={styles.sheetHeaderSubRow}>
-                      <Text style={styles.sheetHeaderBrandText} numberOfLines={1}>
-                        {currentRecord.campaign_title}
+                {/* Header */}
+                <View style={styles.statementSheetHeader}>
+                  <View style={styles.statementSheetHeaderLeft}>
+                    <View style={styles.statementSheetIconSquircle}>
+                      <BottleBadgeIcon size={18} color="#0F172A" />
+                    </View>
+                    <View style={styles.statementSheetHeaderTitles}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
+                        {currentRecord.can_id}
                       </Text>
-                      {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE' ? (
-                        <View style={styles.appleDuplicatePill}>
-                          <View style={styles.duplicateDot} />
-                          <Text style={styles.appleDuplicateText}>Already Scanned</Text>
+                      <View style={styles.sheetHeaderSubRow}>
+                        <Text style={styles.statementSheetRef} numberOfLines={1}>
+                          {currentRecord.campaign_title || 'General Batch'}
+                        </Text>
+                        <View
+                          style={[
+                            styles.minimalStatusPill,
+                            isDuplicate ? styles.appleDuplicatePill : styles.minimalStatusPillSettled,
+                            { marginLeft: 8 },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.minimalStatusDot,
+                              isDuplicate ? styles.duplicateDot : styles.minimalStatusDotSettled,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.minimalStatusText,
+                              isDuplicate ? styles.appleDuplicateText : styles.minimalStatusTextSettled,
+                            ]}
+                          >
+                            {isDuplicate ? 'Already Scanned' : 'Verified'}
+                          </Text>
                         </View>
-                      ) : (
-                        <View style={styles.appleVerifiedPill}>
-                          <View style={styles.verifiedDot} />
-                          <Text style={styles.appleVerifiedText}>Verified</Text>
-                        </View>
-                      )}
+                      </View>
+                    </View>
+                  </View>
+                  <NativePressable
+                    style={styles.sheetCloseButton}
+                    onPress={close}
+                    hapticType="impactLight"
+                    scaleActive={0.9}
+                  >
+                    <X size={16} color="#64748B" />
+                  </NativePressable>
+                </View>
+
+                <View style={styles.statementModalBody}>
+                  {/* ── Status Banner / Hero Card ── */}
+                  <View style={[styles.statementHeroCard, isDuplicate && { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' }]}>
+                    <View style={styles.sheetHeaderSubRow}>
+                      <View
+                        style={[
+                          styles.sheetDeliveryIconCircle,
+                          isDuplicate && styles.sheetDeliveryIconCircleWarning,
+                          { width: 28, height: 28, borderRadius: 14 }
+                        ]}
+                      >
+                        {isDuplicate ? (
+                          <AlertCircle size={15} color="#D97706" />
+                        ) : (
+                          <Check size={15} color="#059669" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={[styles.statementHeroLabel, isDuplicate && { color: '#B45309' }]}>
+                          {isDuplicate ? 'DUPLICATE SCAN DETECTED' : 'DELIVERY LOGGED TO PRODUCTION'}
+                        </Text>
+                        <Text style={[styles.statementHeroSubtitle, isDuplicate && { color: '#92400E' }]}>
+                          {isDuplicate
+                            ? `Previously scanned & recorded • ${currentRecord.deliveryTime}`
+                            : `Recorded ${currentRecord.deliveryTime}`}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* ── Grouped Specs List ── */}
+                  <View style={styles.statementSectionBox}>
+                    <Text style={styles.statementBoxTitle}>DELIVERY SPECIFICATIONS</Text>
+                    
+                    {/* Row 1: Delivery Route */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Delivery Route</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>
+                        {cleanLocationDisplay(currentRecord.location_name)}
+                      </Text>
+                    </View>
+
+                    {/* Row 2: Campaign Batch */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Campaign Batch</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>
+                        {currentRecord.campaign_title || '—'}
+                      </Text>
+                    </View>
+
+                    {/* Row 3: Can Serial ID */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Can Serial ID</Text>
+                      <Text style={styles.statementSpecValueMono}>
+                        {currentRecord.can_id}
+                      </Text>
+                    </View>
+
+                    <View style={styles.statementSpecDivider} />
+
+                    {/* Row 4: Distributor Commission */}
+                    <View style={styles.statementSpecRow}>
+                      <View>
+                        <Text style={styles.statementSpecTotalKey}>Earned Commission</Text>
+                        <Text style={styles.sheetSpecSubLabel}>@ ₹0.50 / verified can</Text>
+                      </View>
+                      <Text style={[styles.statementSpecTotalVal, { color: isDuplicate ? '#94A3B8' : '#059669' }]}>
+                        {isDuplicate ? '₹0.00' : '+₹0.50'}
+                      </Text>
                     </View>
                   </View>
                 </View>
-              </View>
 
-              {/* ── Delivery Time Banner ── */}
-              <View
-                style={[
-                  styles.sheetDeliveryBanner,
-                  (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerWarning,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.sheetDeliveryIconCircle,
-                    (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryIconCircleWarning,
-                  ]}
-                >
-                  {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE' ? (
-                    <AlertCircle size={16} color="#D97706" />
-                  ) : (
-                    <Check size={16} color="#059669" />
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.sheetDeliveryBannerTitle,
-                      (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerTitleWarning,
-                    ]}
+                {/* ── Full Width Apple Done Button ── */}
+                <View style={styles.statementBottomActionRow}>
+                  <NativePressable
+                    style={styles.statementPrimaryActionBtn}
+                    onPress={close}
+                    hapticType="impactLight"
+                    scaleActive={0.97}
                   >
-                    {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE'
-                      ? 'Duplicate Scan Detected'
-                      : 'Delivery Logged to Production'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.sheetDeliveryBannerSub,
-                      (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerSubWarning,
-                    ]}
-                  >
-                    {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE'
-                      ? `Previously scanned & recorded • ${currentRecord.deliveryTime}`
-                      : `Recorded ${currentRecord.deliveryTime}`}
-                  </Text>
+                    <Text style={styles.statementPrimaryActionBtnText}>Close Details</Text>
+                  </NativePressable>
                 </View>
               </View>
-
-              {/* ── Apple Inset Grouped Specs List ── */}
-              <View style={styles.sheetSpecsGroupCard}>
-                {/* Row 1: Target Route */}
-                <View style={styles.sheetSpecRow}>
-                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                    <MapPinIcon size={16} color="#2563EB" />
-                  </View>
-                  <Text style={styles.sheetSpecLabel}>Delivery Route</Text>
-                  <Text style={styles.sheetSpecValue} numberOfLines={2}>
-                    {currentRecord.location_name}
-                  </Text>
-                </View>
-
-                <View style={styles.sheetSpecDivider} />
-
-                {/* Row 2: Campaign */}
-                <View style={styles.sheetSpecRow}>
-                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#ECFEFF' }]}>
-                    <DocSheetIcon size={16} color="#0891B2" />
-                  </View>
-                  <Text style={styles.sheetSpecLabel}>Campaign Batch</Text>
-                  <Text style={styles.sheetSpecValue} numberOfLines={1}>
-                    {currentRecord.campaign_title}
-                  </Text>
-                </View>
-
-                <View style={styles.sheetSpecDivider} />
-
-                {/* Row 3: Bottle Identifier */}
-                <View style={styles.sheetSpecRow}>
-                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                    <QrCode size={16} color="#16A34A" />
-                  </View>
-                  <Text style={styles.sheetSpecLabel}>Can Serial ID</Text>
-                  <Text style={[styles.sheetSpecValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
-                    {currentRecord.can_id}
-                  </Text>
-                </View>
-
-                <View style={styles.sheetSpecDivider} />
-
-                {/* Row 4: Distributor Commission */}
-                <View style={styles.sheetSpecRow}>
-                  <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F5F3FF' }]}>
-                    <RupeeBadgeIcon size={16} color="#7C3AED" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sheetSpecLabel}>Earned Commission</Text>
-                    <Text style={styles.sheetSpecSubLabel}>@ ₹0.50 / verified can</Text>
-                  </View>
-                  <Text style={styles.sheetSpecCommissionValue}>+₹0.50</Text>
-                </View>
-              </View>
-
-              {/* ── Full Width Apple Done Button ── */}
-              <NativePressable
-                style={styles.sheetDoneBtn}
-                onPress={close}
-                hapticType="impactLight"
-                scaleActive={0.97}
-              >
-                <Text style={styles.sheetDoneBtnText}>Close Details</Text>
-              </NativePressable>
-            </View>
-          )}
+            );
+          }}
         </PoppedBottomSheetModal>
       )}
 
@@ -1878,7 +1887,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
                 '========================================',
                 `Ref ID:       ${selectedSettlementModal.id}`,
                 `Date:         ${dateStr}, ${timeStr}`,
-                `Hub:          ${selectedSettlementModal.locationTitle || 'Distribution Hub'}`,
+                `Hub:          ${cleanLocationDisplay(selectedSettlementModal.locationTitle || 'Distribution Hub')}`,
                 `Status:       ${statusText}`,
                 '----------------------------------------',
                 'BATCH & LOGISTICS SPECIFICATIONS',
@@ -2006,7 +2015,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
                     <Text style={styles.statementBoxTitle}>NODE & AUDIT TELEMETRY</Text>
                     <View style={styles.statementSpecRow}>
                       <Text style={styles.statementSpecKey}>Distribution Hub</Text>
-                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>{selectedSettlementModal.locationTitle || 'Distribution Hub'}</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>{cleanLocationDisplay(selectedSettlementModal.locationTitle || 'Distribution Hub')}</Text>
                     </View>
                     <View style={styles.statementSpecRow}>
                       <Text style={styles.statementSpecKey}>GPS Coordinates</Text>
@@ -2687,6 +2696,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     fontWeight: '500',
+    flex: 1,
+    marginRight: 8,
   },
   settlementAccordionRefMono: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
@@ -2700,6 +2711,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 999,
+    flexShrink: 0,
   },
   minimalStatusPillSettled: {
     backgroundColor: '#ECFDF5',

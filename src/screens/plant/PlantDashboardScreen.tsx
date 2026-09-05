@@ -169,6 +169,15 @@ const formatCampaignTitle = (title: string) => {
   return clean;
 };
 
+const cleanLocationDisplay = (loc?: string): string => {
+  if (!loc) return 'Chennai';
+  return String(loc)
+    .replace(/\s*\(undefined\)/gi, '')
+    .replace(/\s*undefined/gi, '')
+    .replace(/,\s*,/g, ',')
+    .trim() || 'Chennai';
+};
+
 // ── Apple Shimmer Skeleton Block ──
 const ShimmerBlock: React.FC<{ style?: any; borderRadius?: number }> = ({
   style,
@@ -507,7 +516,7 @@ const PlantOrderCardItem = React.memo(({
             {displayTitle}
           </Text>
           <Text style={styles.cardSubtitle} numberOfLines={1}>
-            {order.brand} • {order.location}
+            {order.brand} • {cleanLocationDisplay(order.location)}
           </Text>
         </View>
         <View
@@ -639,7 +648,7 @@ const PlantSettlementCardItem = React.memo(({
             {displayTitle}
           </Text>
           <Text style={styles.settlementCardSub} numberOfLines={1}>
-            {record.brandName || 'Brand Partner'} • {record.locationTitle || 'Bottling Facility'}
+            {record.brandName || 'Brand Partner'} • {cleanLocationDisplay(record.locationTitle || 'Bottling Facility')}
           </Text>
         </View>
 
@@ -660,7 +669,7 @@ const PlantSettlementCardItem = React.memo(({
         <View style={styles.settlementAccordionContent}>
           {/* Reference ID & Status */}
           <View style={styles.settlementAccordionHeaderRow}>
-            <Text style={styles.settlementAccordionRefText}>
+            <Text style={styles.settlementAccordionRefText} numberOfLines={1}>
               Ref: <Text style={styles.settlementAccordionRefMono}>{record.id}</Text>
             </Text>
             <View
@@ -704,7 +713,7 @@ const PlantSettlementCardItem = React.memo(({
             <View style={styles.settlementSpecGridRow}>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>FACILITY</Text>
-                <Text style={styles.settlementSpecVal} numberOfLines={1}>{record.locationTitle || 'Bottling Facility'}</Text>
+                <Text style={styles.settlementSpecVal} numberOfLines={1}>{cleanLocationDisplay(record.locationTitle || 'Bottling Facility')}</Text>
               </View>
               <View style={styles.settlementSpecCol}>
                 <Text style={styles.settlementSpecLabel}>SETTLEMENT TIME</Text>
@@ -1961,38 +1970,37 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <View style={styles.sheetHandleIndicator} />
                 </View>
 
-                {/* Header: Squircle Icon + Title/Brand */}
-                <View style={styles.sheetHeaderRow}>
-                  <View style={styles.sheetHeaderLeft}>
-                    <View style={styles.sheetHeaderIconSquircle}>
-                      <DocSheetIcon size={22} color="#056B4A" />
+                {/* Header */}
+                <View style={styles.statementSheetHeader}>
+                  <View style={styles.statementSheetHeaderLeft}>
+                    <View style={styles.statementSheetIconSquircle}>
+                      <DocSheetIcon size={18} color="#0F172A" />
                     </View>
-                    <View style={styles.sheetHeaderTitleWrap}>
-                      <Text style={styles.sheetHeaderTitle} numberOfLines={1}>
+                    <View style={styles.statementSheetHeaderTitles}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
                         {displayTitle}
                       </Text>
                       <View style={styles.sheetHeaderSubRow}>
-                        <Text style={styles.sheetHeaderBrandText} numberOfLines={1}>
+                        <Text style={styles.statementSheetRef} numberOfLines={1}>
                           {currentDetailOrder.brand || 'Brand Partner'}
                         </Text>
                         <View
                           style={[
-                            styles.appleStatusPill,
-                            isCompleted ? styles.appleStatusPillCompleted : styles.appleStatusPillPending,
-                            { marginLeft: 8, paddingHorizontal: 7, paddingVertical: 2 },
+                            styles.minimalStatusPill,
+                            isCompleted ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
+                            { marginLeft: 8 },
                           ]}
                         >
                           <View
                             style={[
-                              styles.statusDot,
-                              isCompleted ? styles.statusDotCompleted : styles.statusDotPending,
+                              styles.minimalStatusDot,
+                              isCompleted ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
                             ]}
                           />
                           <Text
                             style={[
-                              styles.appleStatusText,
-                              isCompleted ? styles.appleStatusTextCompleted : styles.appleStatusTextPending,
-                              { fontSize: 10.5 },
+                              styles.minimalStatusText,
+                              isCompleted ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
                             ]}
                           >
                             {isCompleted ? 'Completed' : 'In Progress'}
@@ -2001,92 +2009,95 @@ export function PlantDashboardScreen({ navigation }: any) {
                       </View>
                     </View>
                   </View>
+                  <NativePressable
+                    style={styles.sheetCloseButton}
+                    onPress={close}
+                    hapticType="impactLight"
+                    scaleActive={0.9}
+                  >
+                    <X size={16} color="#64748B" />
+                  </NativePressable>
                 </View>
 
-                {/* ── Bottling Progress Hero Card ── */}
-                <View style={styles.sheetProgressCard}>
-                  <View style={styles.sheetProgressTopRow}>
-                    <Text style={styles.sheetProgressLabel}>BOTTLING PROGRESS</Text>
-                    <Text style={styles.sheetProgressPercent}>{progress}%</Text>
-                  </View>
-                  <View style={styles.sheetProgressTrack}>
-                    <View style={[styles.sheetProgressFill, { width: `${progress}%` }]} />
-                  </View>
-                  <View style={styles.sheetProgressBottomRow}>
-                    <Text style={styles.sheetProgressCount}>
-                      {currentBottled.toLocaleString('en-IN')} of {currentDetailOrder.quantityNum.toLocaleString('en-IN')} Cans Bottled
-                    </Text>
-                    <Text style={styles.sheetProgressRemaining}>
-                      {remainingCans > 0 ? `${remainingCans.toLocaleString('en-IN')} left` : 'Completed'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* ── Apple Inset Grouped Specs List ── */}
-                <View style={styles.sheetSpecsGroupCard}>
-                  {/* Row 1: Target Location */}
-                  <View style={styles.sheetSpecRow}>
-                    <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#ECF7F2' }]}>
-                      <MapPinIcon size={16} color="#056B4A" />
+                <View style={styles.statementModalBody}>
+                  {/* ── Bottling Progress Hero Card ── */}
+                  <View style={styles.statementHeroCard}>
+                    <View style={styles.sheetProgressTopRow}>
+                      <Text style={styles.statementHeroLabel}>BOTTLING PROGRESS</Text>
+                      <Text style={[styles.statementHeroLabel, { color: isCompleted ? '#059669' : '#0F172A', fontWeight: '800' }]}>{progress}%</Text>
                     </View>
-                    <Text style={styles.sheetSpecLabel}>Target Location</Text>
-                    <Text style={styles.sheetSpecValue} numberOfLines={2}>
-                      {currentDetailOrder.location}
-                    </Text>
+                    <View style={styles.sheetProgressTrack}>
+                      <View style={[styles.sheetProgressFill, { width: `${progress}%` }]} />
+                    </View>
+                    <View style={styles.sheetProgressBottomRow}>
+                      <Text style={styles.sheetProgressCount}>
+                        {currentBottled.toLocaleString('en-IN')} of {currentDetailOrder.quantityNum.toLocaleString('en-IN')} Cans Bottled
+                      </Text>
+                      <Text style={[styles.sheetProgressRemaining, isCompleted && { color: '#059669' }]}>
+                        {remainingCans > 0 ? `${remainingCans.toLocaleString('en-IN')} left` : 'Completed ✓'}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={styles.sheetSpecDivider} />
-
-                  {/* Row 2: Total Quantity */}
-                  <View style={styles.sheetSpecRow}>
-                    <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                      <BottleBadgeIcon size={17} color="#2563EB" />
+                  {/* ── Grouped Specs List ── */}
+                  <View style={styles.statementSectionBox}>
+                    <Text style={styles.statementBoxTitle}>ORDER SPECIFICATIONS</Text>
+                    
+                    {/* Row 1: Target Location */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Target Location</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>
+                        {cleanLocationDisplay(currentDetailOrder.location)}
+                      </Text>
                     </View>
-                    <Text style={styles.sheetSpecLabel}>Total Order</Text>
-                    <Text style={styles.sheetSpecValue}>
-                      {currentDetailOrder.quantityNum.toLocaleString('en-IN')} Cans
-                    </Text>
-                  </View>
 
-                  <View style={styles.sheetSpecDivider} />
-
-                  {/* Row 3: Bottled Output */}
-                  <View style={styles.sheetSpecRow}>
-                    <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                      <TruckBadgeIcon size={16} color="#16A34A" />
+                    {/* Row 2: Total Quantity */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Total Order</Text>
+                      <Text style={styles.statementSpecValueBold}>
+                        {currentDetailOrder.quantityNum.toLocaleString('en-IN')} Cans
+                      </Text>
                     </View>
-                    <Text style={styles.sheetSpecLabel}>Bottled Output</Text>
-                    <Text style={styles.sheetSpecValue}>
-                      {currentBottled.toLocaleString('en-IN')} Cans
-                    </Text>
-                  </View>
 
-                  <View style={styles.sheetSpecDivider} />
+                    {/* Row 3: Bottled Output */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Bottled Output</Text>
+                      <Text style={styles.statementSpecValueBold}>
+                        {currentBottled.toLocaleString('en-IN')} Cans
+                      </Text>
+                    </View>
 
-                  {/* Row 4: Commission Fee */}
-                  <View style={styles.sheetSpecRow}>
-                    <View style={[styles.sheetSpecIconWrap, { backgroundColor: '#F5F3FF' }]}>
-                      <RupeeBadgeIcon size={16} color="#7C3AED" />
+                    {/* Row 4: Commission Fee */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Commission Rate</Text>
+                      <Text style={[styles.statementSpecValueBold, { color: '#059669' }]}>
+                        ₹0.50 / can
+                      </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.sheetSpecLabel}>Commission Payout</Text>
-                      <Text style={styles.sheetSpecSubLabel}>@ ₹0.50 / can</Text>
+
+                    <View style={styles.statementSpecDivider} />
+
+                    {/* Total Estimated Revenue */}
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecTotalKey}>Total Payout Value</Text>
+                      <Text style={styles.statementSpecTotalVal}>
+                        ₹{currentDetailOrder.revenue.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                      </Text>
                     </View>
-                    <Text style={styles.sheetSpecCommissionValue}>
-                      ₹{currentDetailOrder.revenue.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-                    </Text>
                   </View>
                 </View>
 
                 {/* ── Full Width Apple Done Button ── */}
-                <NativePressable
-                  style={styles.sheetDoneBtn}
-                  onPress={close}
-                  hapticType="impactLight"
-                  scaleActive={0.97}
-                >
-                  <Text style={styles.sheetDoneBtnText}>Close Details</Text>
-                </NativePressable>
+                <View style={styles.statementBottomActionRow}>
+                  <NativePressable
+                    style={styles.statementPrimaryActionBtn}
+                    onPress={close}
+                    hapticType="impactLight"
+                    scaleActive={0.97}
+                  >
+                    <Text style={styles.statementPrimaryActionBtnText}>Close Details</Text>
+                  </NativePressable>
+                </View>
               </View>
             );
           }}
@@ -2114,7 +2125,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                 '========================================',
                 `Ref ID:       ${selectedSettlementModal.id}`,
                 `Date:         ${dateStr}, ${timeStr}`,
-                `Facility:     ${selectedSettlementModal.locationTitle || 'Bottling Facility'}`,
+                `Facility:     ${cleanLocationDisplay(selectedSettlementModal.locationTitle || 'Bottling Facility')}`,
                 `Status:       ${statusText}`,
                 '----------------------------------------',
                 'BATCH & BOTTLING SPECIFICATIONS',
@@ -2242,7 +2253,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                     <Text style={styles.statementBoxTitle}>NODE & AUDIT TELEMETRY</Text>
                     <View style={styles.statementSpecRow}>
                       <Text style={styles.statementSpecKey}>Plant Facility</Text>
-                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>{selectedSettlementModal.locationTitle || 'Bottling Facility'}</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>{cleanLocationDisplay(selectedSettlementModal.locationTitle || 'Bottling Facility')}</Text>
                     </View>
                     <View style={styles.statementSpecRow}>
                       <Text style={styles.statementSpecKey}>GPS Coordinates</Text>
