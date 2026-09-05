@@ -35,6 +35,8 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NativePressable } from './common/NativePressable';
 
+import { extractCleanQrId } from '../utils/locationProfiles';
+
 const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
 
@@ -55,7 +57,15 @@ const formatCampaignTitle = (title?: string) => {
 export interface DashboardQRScannerModalProps {
   visible: boolean;
   onClose: () => void;
-  onScan: (scannedCode: string) => void;
+  onScan: (scannedCode: string) => Promise<{
+    success?: boolean;
+    message?: string;
+    can_id?: string;
+    current_count?: number;
+    already_scanned?: boolean;
+    is_rescan?: boolean;
+  } | void> | void;
+  onSimulateBulk?: (amount: number) => Promise<void> | void;
   onComplete?: (totalScannedInSession: number) => void;
   onPerformLiveScan?: () => void;
   title?: string;
@@ -68,6 +78,7 @@ export const DashboardQRScannerModal: React.FC<DashboardQRScannerModalProps> = (
   visible,
   onClose,
   onScan,
+  onSimulateBulk,
   onComplete,
   onPerformLiveScan,
   title = 'Burst Scanner',
@@ -81,6 +92,7 @@ export const DashboardQRScannerModal: React.FC<DashboardQRScannerModalProps> = (
     <ActiveScannerContent
       onClose={onClose}
       onScan={onScan}
+      onSimulateBulk={onSimulateBulk}
       onComplete={onComplete}
       onPerformLiveScan={onPerformLiveScan}
       title={title}
@@ -94,6 +106,7 @@ export const DashboardQRScannerModal: React.FC<DashboardQRScannerModalProps> = (
 const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible'>> = ({
   onClose,
   onScan,
+  onSimulateBulk,
   onComplete,
   onPerformLiveScan,
   title = 'Burst Scanner',
@@ -107,12 +120,29 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   const [torch, setTorch] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [hudFeedback, setHudFeedback] = useState<{
+    status: 'IDLE' | 'SUCCESS' | 'DUPLICATE' | 'ERROR';
+    message: string;
+    canId?: string;
+  }>({ status: 'IDLE', message: 'Ready to scan' });
 
   const cameraDevice = useCameraDevice(cameraPosition);
   const recentCodesRef = useRef<Map<string, number>>(new Map());
+  const sessionScannedCodesRef = useRef<Set<string>>(new Set());
+  const hudTimerRef = useRef<any>(null);
+
   const laserAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const badgeAnim = useRef(new Animated.Value(0)).current;
+
+  // Flash transient HUD feedback
+  const flashHud = useCallback((status: 'SUCCESS' | 'DUPLICATE' | 'ERROR', message: string, canId?: string) => {
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+    setHudFeedback({ status, message, canId });
+    hudTimerRef.current = setTimeout(() => {
+      setHudFeedback({ status: 'IDLE', message: 'Ready to scan' });
+    }, status === 'SUCCESS' ? 1200 : 2000);
+  }, []);
 
   // Request camera permission on button press
   const handleRequestPermission = useCallback(async () => {
@@ -176,48 +206,105 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     }).start();
   }, [pulseAnim, badgeAnim]);
 
-  // Code scanner with rapid burst debounce (allows different QR codes instantly)
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
-    onCodeScanned: (codes) => {
-      const firstVal = codes[0]?.value;
-      if (!firstVal) return;
+  // Process a scanned code through extractCleanQrId and onScan
+  const processCode = useCallback(
+    async (rawVal: string, isManual = false) => {
+      const cleanCode = extractCleanQrId(rawVal);
+      if (!cleanCode || cleanCode.length < 3) return;
+
+      // In continuous camera mode, avoid repeat triggers on the exact code already processed in this active session
+      if (!isManual && sessionScannedCodesRef.current.has(cleanCode)) {
+        return;
+      }
 
       const now = Date.now();
-      const lastScannedTime = recentCodesRef.current.get(firstVal) || 0;
+      const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
+      if (!isManual && now - lastScannedTime < 2200) return;
+      recentCodesRef.current.set(cleanCode, now);
 
-      // Ignore if the exact same physical code was scanned in the last 1500ms
-      if (now - lastScannedTime < 1500) return;
-
-      recentCodesRef.current.set(firstVal, now);
-
-      // Clean up old entries in recentCodesRef
       if (recentCodesRef.current.size > 50) {
         recentCodesRef.current.forEach((time, c) => {
           if (now - time > 10000) recentCodesRef.current.delete(c);
         });
       }
 
-      triggerScanFeedback(firstVal);
-      onScan(firstVal);
+      try {
+        const result = onScan(cleanCode);
+        if (result && typeof (result as any).then === 'function') {
+          const res = await result;
+          if (res) {
+            const isDup = Boolean(res.already_scanned || res.is_rescan);
+            if (isDup) {
+              sessionScannedCodesRef.current.add(cleanCode);
+              ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
+              flashHud('DUPLICATE', `⚠️ Already Recorded: ${res.can_id || cleanCode}`, res.can_id || cleanCode);
+              return;
+            }
+
+            sessionScannedCodesRef.current.add(cleanCode);
+            if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
+            triggerScanFeedback(res.can_id || cleanCode);
+            flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
+          }
+        } else {
+          sessionScannedCodesRef.current.add(cleanCode);
+          triggerScanFeedback(cleanCode);
+          flashHud('SUCCESS', `✓ ${cleanCode} Scanned`, cleanCode);
+        }
+      } catch (err: any) {
+        const isDup =
+          err?.response?.status === 409 ||
+          err?.response?.data?.already_scanned ||
+          err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('already');
+
+        if (isDup) {
+          sessionScannedCodesRef.current.add(cleanCode);
+          ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
+          flashHud('DUPLICATE', `⚠️ Already Scanned`, cleanCode);
+        } else {
+          ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
+          flashHud('ERROR', err?.response?.data?.message || 'Scan unverified', cleanCode);
+        }
+      }
+    },
+    [onScan, triggerScanFeedback, flashHud]
+  );
+
+  // VisionCamera code scanner
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr', 'ean-13', 'code-128'],
+    onCodeScanned: (codes) => {
+      const firstVal = codes[0]?.value;
+      if (!firstVal) return;
+      processCode(firstVal);
     },
   });
 
-  const handleSimulateBurst = useCallback((count: number = 1) => {
-    ReactNativeHapticFeedback.trigger('impactHeavy', { enableVibrateFallback: true });
+  const handleSimulateBurst = useCallback(
+    async (count: number = 1) => {
+      ReactNativeHapticFeedback.trigger('impactHeavy', { enableVibrateFallback: true });
 
-    for (let i = 0; i < count; i++) {
-      const mockCode = `CAN-60000${Math.floor(Math.random() * 9 + 1)}-${Math.floor(Math.random() * 89999 + 10000)}`;
-      setTimeout(() => {
-        triggerScanFeedback(mockCode);
-        if (onPerformLiveScan) {
-          onPerformLiveScan();
-        } else {
-          onScan(mockCode);
-        }
-      }, i * 180);
-    }
-  }, [triggerScanFeedback, onPerformLiveScan, onScan]);
+      if (onSimulateBulk) {
+        try {
+          await onSimulateBulk(count);
+          setSessionCount((prev) => prev + count);
+          flashHud('SUCCESS', `✓ +${count.toLocaleString()} Cans Bulk Logged`);
+          return;
+        } catch (e) {}
+      }
+
+      for (let i = 0; i < count; i++) {
+        const mockCode = isPlant
+          ? `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`
+          : `CAN-60000${Math.floor(Math.random() * 9 + 1)}-${Math.floor(Math.random() * 89999 + 10000)}`;
+        setTimeout(() => {
+          processCode(mockCode, true);
+        }, i * 160);
+      }
+    },
+    [onSimulateBulk, isPlant, processCode, flashHud]
+  );
 
   const handleCompleteScanning = useCallback(() => {
     ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
@@ -238,6 +325,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
     setTorch((prev) => !prev);
   }, []);
+
 
   const formattedTitle = formatCampaignTitle(activeCampaignTitle);
 
@@ -429,26 +517,41 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             />
           </View>
 
-          {/* Minimal Status / Guidance Pill */}
+          {/* Dynamic Status / Guidance Pill */}
           <Animated.View
             style={[
               styles.sessionCounterChip,
-              sessionCount > 0 && styles.sessionCounterChipActive,
+              hudFeedback.status === 'SUCCESS' && styles.sessionCounterChipSuccess,
+              hudFeedback.status === 'DUPLICATE' && styles.sessionCounterChipWarning,
+              hudFeedback.status === 'ERROR' && styles.sessionCounterChipError,
+              hudFeedback.status === 'IDLE' && sessionCount > 0 && styles.sessionCounterChipActive,
               { transform: [{ scale: pulseAnim }] },
             ]}
           >
-            {sessionCount > 0 ? (
-              <CheckCircle2 size={13} color="#A7F3D0" />
+            {hudFeedback.status === 'SUCCESS' ? (
+              <CheckCircle2 size={13} color="#10B981" />
+            ) : hudFeedback.status === 'DUPLICATE' ? (
+              <Zap size={13} color="#F59E0B" />
+            ) : hudFeedback.status === 'ERROR' ? (
+              <ShieldAlert size={13} color="#EF4444" />
+            ) : sessionCount > 0 ? (
+              <CheckCircle2 size={13} color="#10B981" />
             ) : (
               <View style={styles.guidanceDot} />
             )}
             <Text
               style={[
                 styles.sessionCounterText,
-                sessionCount > 0 && styles.sessionCounterTextActive,
+                hudFeedback.status === 'SUCCESS' && styles.sessionCounterTextSuccess,
+                hudFeedback.status === 'DUPLICATE' && styles.sessionCounterTextWarning,
+                hudFeedback.status === 'ERROR' && styles.sessionCounterTextError,
+                hudFeedback.status === 'IDLE' && sessionCount > 0 && styles.sessionCounterTextActive,
               ]}
+              numberOfLines={1}
             >
-              {sessionCount === 0
+              {hudFeedback.status !== 'IDLE'
+                ? hudFeedback.message
+                : sessionCount === 0
                 ? 'Align QR code within frame'
                 : `${sessionCount} ${sessionCount === 1 ? 'Can' : 'Cans'} Verified`}
             </Text>
@@ -794,6 +897,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 107, 74, 0.90)',
     borderColor: 'rgba(167, 243, 208, 0.5)',
   },
+  sessionCounterChipSuccess: {
+    backgroundColor: 'rgba(5, 107, 74, 0.95)',
+    borderColor: '#10B981',
+  },
+  sessionCounterChipWarning: {
+    backgroundColor: 'rgba(180, 83, 9, 0.95)',
+    borderColor: '#F59E0B',
+  },
+  sessionCounterChipError: {
+    backgroundColor: 'rgba(185, 28, 28, 0.95)',
+    borderColor: '#EF4444',
+  },
   guidanceDot: {
     width: 6,
     height: 6,
@@ -808,6 +923,18 @@ const styles = StyleSheet.create({
   },
   sessionCounterTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  sessionCounterTextSuccess: {
+    color: '#ECFDF5',
+    fontWeight: '700',
+  },
+  sessionCounterTextWarning: {
+    color: '#FEF3C7',
+    fontWeight: '700',
+  },
+  sessionCounterTextError: {
+    color: '#FEE2E2',
     fontWeight: '700',
   },
   lastScanPill: {

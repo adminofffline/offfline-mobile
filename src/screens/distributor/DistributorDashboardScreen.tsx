@@ -50,6 +50,8 @@ import {
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation } from '../../context/LocationContext';
+import { extractCleanQrId, resolveLocationGps } from '../../utils/locationProfiles';
 import { distributorApi } from '../../api/distributor';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
@@ -497,6 +499,7 @@ const DistributorSettlementCardItem = React.memo(({ record }: { record: Settleme
 
 export function DistributorDashboardScreen({ navigation }: any) {
   const { user, signOut, refreshProfile } = useAuth();
+  const { location } = useLocation();
   const currentUser = user;
 
   const [activeTab, setActiveTab] = useState<'scan-reports' | 'settlement-report'>('scan-reports');
@@ -673,32 +676,112 @@ export function DistributorDashboardScreen({ navigation }: any) {
     loadProductionData();
   }, [loadProductionData]);
 
-  // ── Real Camera & Vision Code Burst Scanner Handlers ──
-  const handleRealQrScanned = useCallback((scannedCode: string) => {
-    const cleanCode = String(scannedCode || '').trim();
-    const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // ── Real Camera & Vision Code Burst Scanner Handlers (Web Parity) ──
+  const handleRealQrScanned = useCallback(
+    async (scannedCode: string) => {
+      const cleanQr = extractCleanQrId(scannedCode);
+      if (!cleanQr) return;
 
-    const newScan: ScanRecord = {
-      id: `SCN_${Date.now()}_${Math.random()}`,
-      can_id: cleanCode.startsWith('CAN-') ? cleanCode : `CAN-${cleanCode.slice(-6).toUpperCase()}`,
-      campaign_title: 'Live Delivery Batch',
-      location_name: 'Chennai Central Hub',
-      deliveryTime: formattedDeliveryTime,
-      payout_amount: 0.50,
-      status: 'VERIFIED',
-    };
+      const coords = location
+        ? { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy }
+        : resolveLocationGps(profileAddress || 'Chennai Central Hub');
 
-    setScans((prev) => [newScan, ...prev]);
-    setScannerCount((c) => c + 1);
+      const scanPayload = {
+        qr_id: cleanQr,
+        campaign_id: 'CMP_LIVE_DIST_1',
+        latitude: coords.latitude || 13.0827,
+        longitude: coords.longitude || 80.2707,
+        accuracy: coords.accuracy || 5.0,
+      };
 
-    distributorApi.scanQr({
-      qr_id: cleanCode,
-      campaign_id: 'CMP_LIVE_DIST_1',
-      latitude: 13.0827,
-      longitude: 80.2707,
-      accuracy: 5.0,
-    }).catch(() => null);
-  }, []);
+      try {
+        const res = await distributorApi.scanQr(scanPayload);
+        if (res.data?.success) {
+          const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
+          if (isRescan) {
+            triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already delivered!`);
+            return res.data;
+          }
+
+          const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
+          const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const payoutVal = Number(res.data.rate_per_unit || res.data.gross_amount || 0.40);
+
+          const newScan: ScanRecord = {
+            id: res.data.scan_id || `SCN_${Date.now()}_${Math.random()}`,
+            can_id: canId,
+            campaign_title: res.data.campaign_title || res.data.campaign?.title || 'Live Delivery Batch',
+            location_name: res.data.location_name || 'Chennai Central Hub',
+            deliveryTime: formattedDeliveryTime,
+            payout_amount: payoutVal,
+            status: 'VERIFIED',
+          };
+
+          setScans((prev) => [newScan, ...prev]);
+          setScannerCount((c) => c + 1);
+
+          // Add to distributor ledger
+          const newLedgerItem: SettlementRecord = {
+            id: `DIST-${Date.now().toString().slice(-4)}`,
+            campaignTitle: res.data.campaign_title || res.data.campaign?.title || 'Live Delivery Batch',
+            brandName: res.data.brand_name || res.data.campaign?.brand || 'Offfline Advertiser',
+            bottlesCount: 1,
+            commission: payoutVal,
+            deliveryDate: 'Today, ' + formattedDeliveryTime,
+            settlementStatus: 'SETTLED',
+          };
+          setLedgerRecords((prev) => [newLedgerItem, ...prev]);
+
+          triggerToast(`✓ Can ${canId} delivered & verified!`);
+          return res.data;
+        }
+        return res.data;
+      } catch (err: any) {
+        const isDup =
+          err?.response?.status === 409 ||
+          err?.response?.data?.already_scanned ||
+          err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('already');
+
+        if (isDup) {
+          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already delivered!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+        }
+
+        const errMsg = err?.response?.data?.message || 'Delivery scan verification failed';
+        triggerToast(`❌ ${errMsg}`);
+        throw err;
+      }
+    },
+    [location, profileAddress]
+  );
+
+  const handleSimulateBulkDistributor = useCallback(
+    async (amount: number) => {
+      const campId = 'CMP_LIVE_DIST_1';
+      try {
+        await distributorApi.bulkSimulateScans(campId, amount);
+        setScannerCount((c) => c + amount);
+
+        const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const bulkScans: ScanRecord[] = Array.from({ length: Math.min(amount, 5) }).map((_, idx) => ({
+          id: `SCN_BULK_${Date.now()}_${idx}`,
+          can_id: `CAN-${Math.floor(100000 + Math.random() * 900000)}`,
+          campaign_title: 'Live Delivery Batch',
+          location_name: 'Chennai Central Hub',
+          deliveryTime: formattedDeliveryTime,
+          payout_amount: 0.40,
+          status: 'VERIFIED',
+        }));
+
+        setScans((prev) => [...bulkScans, ...prev]);
+        triggerToast(`🎉 Bulk batch of ${amount.toLocaleString()} deliveries recorded & verified!`);
+      } catch (e) {
+        triggerToast(`❌ Bulk simulation failed`);
+      }
+    },
+    []
+  );
 
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
@@ -710,31 +793,9 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // ── Handle Real QR Scan Submission on Production ──
   const handlePerformLiveScan = useCallback(() => {
-    const generatedCanId = `CAN-600001-${Math.floor(Math.random() * 89999 + 10000)}`;
-    const generatedQrId = `WA-DST-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 899 + 100)}`;
-    const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const newScan: ScanRecord = {
-      id: `SCN_${Date.now()}`,
-      can_id: generatedCanId,
-      campaign_title: 'Live Delivery Batch',
-      location_name: 'Chennai Central Hub',
-      deliveryTime: formattedDeliveryTime,
-      payout_amount: 0.50,
-      status: 'VERIFIED',
-    };
-
-    setScans((prev) => [newScan, ...prev]);
-    setScannerCount((c) => c + 1);
-
-    distributorApi.scanQr({
-      qr_id: generatedQrId,
-      campaign_id: 'CMP_LIVE_DIST_1',
-      latitude: 13.0827,
-      longitude: 80.2707,
-      accuracy: 5.0,
-    }).catch(() => null);
-  }, []);
+    const generatedQrId = `WA-DST-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`;
+    handleRealQrScanned(generatedQrId);
+  }, [handleRealQrScanned]);
 
   // ── Handle Save Profile to Production Server ──
   const handleSaveProfile = async () => {
@@ -1153,6 +1214,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
         onClose={() => setShowQrModal(false)}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
+        onSimulateBulk={handleSimulateBulkDistributor}
         onPerformLiveScan={handlePerformLiveScan}
         title="Burst Scanner"
         activeCampaignTitle="Live Delivery Batch"

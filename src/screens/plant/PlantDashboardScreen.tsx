@@ -47,6 +47,8 @@ import {
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation } from '../../context/LocationContext';
+import { extractCleanQrId, resolveLocationGps } from '../../utils/locationProfiles';
 import { plantApi } from '../../api/plant';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
@@ -645,6 +647,7 @@ const PlantSettlementCardItem = React.memo(({ record }: { record: SettlementReco
 
 export function PlantDashboardScreen({ navigation }: any) {
   const { user, signOut, refreshProfile } = useAuth();
+  const { location } = useLocation();
   const currentUser = user;
 
   const [activeTab, setActiveTab] = useState<'work-orders' | 'settlement-report'>('work-orders');
@@ -939,45 +942,128 @@ export function PlantDashboardScreen({ navigation }: any) {
     plantApi.bulkSimulateScans(orderId, boostVal).catch(() => {});
   };
 
-  // ── Real Camera & Vision Code Burst Scanner Handlers ──
-  const handleRealQrScanned = useCallback((scannedCode: string) => {
-    const activeCamp = selectedScanCampaign || orders[0];
-    const cleanQr = String(scannedCode || '').trim();
+  // ── Real Camera & Vision Code Burst Scanner Handlers (Web Parity) ──
+  const handleRealQrScanned = useCallback(
+    async (scannedCode: string) => {
+      const activeCamp = selectedScanCampaign || orders[0];
+      const cleanQr = extractCleanQrId(scannedCode);
+      if (!cleanQr) return;
 
-    setScannerCount((c) => c + 1);
-    setBottledDispatchedCans((prev) => prev + 1);
-    setBottlingCommissionTotal((prev) => prev + 0.50);
+      const coords = location
+        ? { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy }
+        : resolveLocationGps(activeCamp?.location || currentLocationDisplay);
 
-    if (activeCamp) {
-      setOrders((prev) =>
-        prev.map((ord) => {
-          if (ord.id === activeCamp.id) {
-            const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
-            return {
-              ...ord,
-              bottledNum: nextBottled,
-              status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
-            };
+      const scanPayload = {
+        qr_id: cleanQr,
+        campaign_id: activeCamp?.id || 'CMP_GEN_1',
+        plant_id: activeCamp?.plant_id || (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
+        plant_name: (activeCamp as any)?.plant_name || plantProfileName || currentUser?.fullName || 'Water Plant Facility',
+        location_name: activeCamp?.location || currentLocationDisplay,
+        latitude: coords.latitude || 13.0827,
+        longitude: coords.longitude || 80.2707,
+        accuracy: coords.accuracy || 5.0,
+      };
+
+      try {
+        const res = await plantApi.scanQr(scanPayload);
+        if (res.data?.success) {
+          const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
+          if (isRescan) {
+            triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already recorded!`);
+            return res.data;
           }
-          return ord;
-        })
-      );
-    }
 
-    // Background non-blocking network telemetry
-    const scanPayload = {
-      qr_id: cleanQr,
-      campaign_id: activeCamp?.id || 'CMP_GEN_1',
-      plant_id: activeCamp?.plant_id || currentUser?._id || 'PLANT_CH_01',
-      plant_name: plantProfileName,
-      location_name: activeCamp?.location || 'Chennai Hub',
-      latitude: 13.0827,
-      longitude: 80.2707,
-      accuracy: 4.5,
-    };
+          const updatedCount = Number(res.data.current_count || (bottledDispatchedCans + 1));
+          setScannerCount((c) => c + 1);
+          setBottledDispatchedCans((prev) => prev + 1);
+          setBottlingCommissionTotal((prev) => prev + 0.50);
 
-    plantApi.scanQr(scanPayload).catch(() => {});
-  }, [selectedScanCampaign, orders, currentUser, plantProfileName]);
+          if (activeCamp) {
+            setOrders((prev) =>
+              prev.map((ord) => {
+                if (ord.id === activeCamp.id) {
+                  const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
+                  return {
+                    ...ord,
+                    bottledNum: nextBottled,
+                    status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
+                  };
+                }
+                return ord;
+              })
+            );
+          }
+
+          // Add to plant production ledger
+          const newLedgerItem: SettlementRecord = {
+            id: `PLANT-${Date.now().toString().slice(-4)}`,
+            campaignTitle: activeCamp?.campaign || 'Water Bottling Campaign',
+            brandName: activeCamp?.brand || 'Verified Brand',
+            bottlesCount: 1,
+            commission: 0.50,
+            deliveryDate: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            settlementStatus: 'SETTLED',
+          };
+          setLedgerRecords((prev) => [newLedgerItem, ...prev]);
+
+          triggerToast(`✓ Can ${res.data.can_id || cleanQr} verified & bottled!`);
+          return res.data;
+        }
+        return res.data;
+      } catch (err: any) {
+        const isDup =
+          err?.response?.status === 409 ||
+          err?.response?.data?.already_scanned ||
+          err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('already');
+
+        if (isDup) {
+          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+        }
+
+        const errMsg = err?.response?.data?.message || 'Scan verification failed';
+        triggerToast(`❌ ${errMsg}`);
+        throw err;
+      }
+    },
+    [selectedScanCampaign, orders, currentUser, plantProfileName, location, currentLocationDisplay, bottledDispatchedCans]
+  );
+
+  const handleSimulateBulkPlant = useCallback(
+    async (amount: number) => {
+      const activeCamp = selectedScanCampaign || orders[0];
+      const campId = activeCamp?.id || 'CMP_GEN_1';
+
+      try {
+        await plantApi.bulkSimulateScans(campId, amount);
+        setScannerCount((c) => c + amount);
+        setBottledDispatchedCans((prev) => prev + amount);
+        setBottlingCommissionTotal((prev) => prev + amount * 0.50);
+
+        if (activeCamp) {
+          setOrders((prev) =>
+            prev.map((ord) => {
+              if (ord.id === activeCamp.id) {
+                const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + amount);
+                return {
+                  ...ord,
+                  bottledNum: nextBottled,
+                  status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
+                };
+              }
+              return ord;
+            })
+          );
+        }
+
+        triggerToast(`🎉 Bulk batch of ${amount.toLocaleString()} cans recorded & verified!`);
+      } catch (e) {
+        triggerToast(`❌ Bulk simulation failed`);
+      }
+    },
+    [selectedScanCampaign, orders]
+  );
 
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
@@ -991,38 +1077,8 @@ export function PlantDashboardScreen({ navigation }: any) {
   const handlePerformLiveScan = useCallback(() => {
     const activeCamp = selectedScanCampaign || orders[0];
     const generatedQrId = `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`;
-
-    setScannerCount((c) => c + 1);
-    setBottledDispatchedCans((prev) => prev + 1);
-    setBottlingCommissionTotal((prev) => prev + 0.50);
-
-    if (activeCamp) {
-      setOrders((prev) =>
-        prev.map((ord) => {
-          if (ord.id === activeCamp.id) {
-            const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
-            return {
-              ...ord,
-              bottledNum: nextBottled,
-              status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
-            };
-          }
-          return ord;
-        })
-      );
-    }
-
-    plantApi.scanQr({
-      qr_id: generatedQrId,
-      campaign_id: activeCamp?.id || 'CMP_GEN_1',
-      plant_id: activeCamp?.plant_id || currentUser?._id || 'PLANT_CH_01',
-      plant_name: plantProfileName,
-      location_name: activeCamp?.location || 'Chennai Hub',
-      latitude: 13.0827,
-      longitude: 80.2707,
-      accuracy: 4.5,
-    }).catch(() => {});
-  }, [selectedScanCampaign, orders, currentUser, plantProfileName]);
+    handleRealQrScanned(generatedQrId);
+  }, [selectedScanCampaign, orders, handleRealQrScanned]);
 
   // ── Handle Save Profile to Production ──
   const handleSaveProfile = async () => {
@@ -1437,6 +1493,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         onClose={() => setShowQrModal(false)}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
+        onSimulateBulk={handleSimulateBulkPlant}
         onPerformLiveScan={handlePerformLiveScan}
         title="Burst Scanner"
         activeCampaignTitle={selectedScanCampaign?.campaign || orders[0]?.campaign}

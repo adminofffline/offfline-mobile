@@ -36,6 +36,7 @@ import { useLocation } from '../../context/LocationContext';
 import { plantApi } from '../../api/plant';
 import { distributorApi } from '../../api/distributor';
 import { SoundService } from '../../utils/soundService';
+import { extractCleanQrId } from '../../utils/locationProfiles';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { CONFIG } from '../../constants/config';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
@@ -131,7 +132,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     }
     lastScannedTimestamp.current = now;
 
-    const cleanCode = data.trim();
+    const cleanCode = extractCleanQrId(data);
     if (!cleanCode) return;
 
     if (scannedCache.current.has(cleanCode)) {
