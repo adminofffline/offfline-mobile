@@ -15,7 +15,6 @@ import {
   StatusBar,
   Animated,
   TouchableWithoutFeedback,
-  Share,
 } from 'react-native';
 import {
   FileText,
@@ -52,7 +51,6 @@ import {
   Tag,
   Layers,
   ExternalLink,
-  Share2,
   Printer,
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -1875,47 +1873,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
           {({ close }) => {
             const isSettled = selectedSettlementModal.settlementStatus === 'SETTLED';
             const displayTitle = formatCampaignTitle(selectedSettlementModal.campaignTitle);
-            const handleShareStatement = () => {
-              ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
-              const dateStr = selectedSettlementModal.deliveryDate || new Date().toISOString().split('T')[0];
-              const timeStr = selectedSettlementModal.deliveryTime || '11:00 AM';
-              const statusText = isSettled ? 'SETTLED VIA BANKING ✓' : 'PENDING EOD SETTLEMENT';
-              const formattedCommission = selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-              const message = [
-                '========================================',
-                '       OFFFLINE SETTLEMENT STATEMENT    ',
-                '========================================',
-                `Ref ID:       ${selectedSettlementModal.id}`,
-                `Date:         ${dateStr}, ${timeStr}`,
-                `Hub:          ${cleanLocationDisplay(selectedSettlementModal.locationTitle || 'Distribution Hub')}`,
-                `Status:       ${statusText}`,
-                '----------------------------------------',
-                'BATCH & LOGISTICS SPECIFICATIONS',
-                `Batch:        ${displayTitle}`,
-                `Brand:        ${selectedSettlementModal.brandName}`,
-                `SAC Code:     998361 (Water Media Advertising)`,
-                `Volume:       ${selectedSettlementModal.bottlesCount.toLocaleString('en-IN')} × 20L Water Cans`,
-                `Distributor Rate: ₹1.50 / Can`,
-                '----------------------------------------',
-                'FINANCIAL SETTLEMENT BREAKDOWN',
-                `Gross Value:  ₹${formattedCommission}`,
-                `TDS (2%):     Auto-Reconciled`,
-                '----------------------------------------',
-                `NET DISBURSED PAYOUT:  +₹${formattedCommission}`,
-                '----------------------------------------',
-                'NODE & AUDIT TELEMETRY',
-                `GPS Telemetry: ${selectedSettlementModal.gpsCoords || '13.0827° N, 80.2707° E'}`,
-                `Node Server:  ${selectedSettlementModal.ipAddress || '127.0.0.1'}`,
-                'Verification: Cryptographically Verified ✓',
-                '========================================',
-                'Generated via Offfline Smart Logistics Platform',
-              ].join('\n');
-
-              Share.share({
-                title: `Settlement Statement - ${selectedSettlementModal.id}`,
-                message,
-              });
-            };
 
             return (
               <View style={styles.bottomSheetCard}>
@@ -2036,17 +1993,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* Bottom Action Row (Pinned & Guaranteed Full Height) */}
+                {/* ── Full Width Apple Done Button ── */}
                 <View style={styles.statementBottomActionRow}>
-                  <NativePressable
-                    style={styles.statementSecondaryActionBtn}
-                    onPress={handleShareStatement}
-                    hapticType="impactLight"
-                    scaleActive={0.97}
-                  >
-                    <Share2 size={15} color="#0F172A" />
-                    <Text style={styles.statementSecondaryActionBtnText}>Share Statement</Text>
-                  </NativePressable>
                   <NativePressable
                     style={styles.statementPrimaryActionBtn}
                     onPress={close}
