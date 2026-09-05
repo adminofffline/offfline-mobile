@@ -16,8 +16,8 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
                BuildableName = "Offfline.app"
-               BlueprintName = "WaterAds"
-               ReferencedContainer = "container:WaterAds.xcodeproj">
+               BlueprintName = "Offfline"
+               ReferencedContainer = "container:Offfline.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "WaterAdsTests.xctest"
-               BlueprintName = "WaterAdsTests"
-               ReferencedContainer = "container:WaterAds.xcodeproj">
+               BuildableName = "OffflineTests.xctest"
+               BlueprintName = "OffflineTests"
+               ReferencedContainer = "container:Offfline.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -56,8 +56,8 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
             BuildableName = "Offfline.app"
-            BlueprintName = "WaterAds"
-            ReferencedContainer = "container:WaterAds.xcodeproj">
+            BlueprintName = "Offfline"
+            ReferencedContainer = "container:Offfline.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -73,8 +73,8 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
             BuildableName = "Offfline.app"
-            BlueprintName = "WaterAds"
-            ReferencedContainer = "container:WaterAds.xcodeproj">
+            BlueprintName = "Offfline"
+            ReferencedContainer = "container:Offfline.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

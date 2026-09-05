@@ -28,11 +28,11 @@ cd "${IOS_DIR}"
 
 if [ "${MODE}" == "--archive" ] || [ "${MODE}" == "--release" ]; then
     echo "🔨 Creating iOS Release Archive..."
-    ARCHIVE_PATH="${OUTPUT_DIR}/WaterAds.xcarchive"
+    ARCHIVE_PATH="${OUTPUT_DIR}/Offfline.xcarchive"
     rm -rf "${ARCHIVE_PATH}"
     
-    xcodebuild -workspace WaterAds.xcworkspace \
-        -scheme WaterAds \
+    xcodebuild -workspace Offfline.xcworkspace \
+        -scheme Offfline \
         -configuration Release \
         -destination 'generic/platform=iOS' \
         -archivePath "${ARCHIVE_PATH}" \
@@ -51,8 +51,8 @@ if [ "${MODE}" == "--archive" ] || [ "${MODE}" == "--release" ]; then
 
 else
     echo "🔨 Building iOS Simulator App Bundle..."
-    xcodebuild -workspace WaterAds.xcworkspace \
-        -scheme WaterAds \
+    xcodebuild -workspace Offfline.xcworkspace \
+        -scheme Offfline \
         -configuration Debug \
         -sdk iphonesimulator \
         -destination 'generic/platform=iOS Simulator' \
@@ -61,7 +61,7 @@ else
         CODE_SIGNING_REQUIRED=NO
 
     # Locate generated .app in DerivedData
-    DERIVED_DATA_BUILD=$(xcodebuild -workspace WaterAds.xcworkspace -scheme WaterAds -configuration Debug -sdk iphonesimulator -showBuildSettings | grep " BUILD_DIR =" | awk '{print $3}')
+    DERIVED_DATA_BUILD=$(xcodebuild -workspace Offfline.xcworkspace -scheme Offfline -configuration Debug -sdk iphonesimulator -showBuildSettings | grep " BUILD_DIR =" | awk '{print $3}')
     APP_BUNDLE="${DERIVED_DATA_BUILD}/Debug-iphonesimulator/Offfline.app"
     
     if [ -d "${APP_BUNDLE}" ]; then
