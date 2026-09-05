@@ -1337,6 +1337,35 @@ export function DistributorDashboardScreen({ navigation }: any) {
     return groupSettlementsByDate(ledgerRecords);
   }, [ledgerRecords]);
 
+  const { totalSettledAmount, yetToSettleAmount, settledCount, pendingCount } = useMemo(() => {
+    let settled = 0;
+    let pending = 0;
+    let sCount = 0;
+    let pCount = 0;
+
+    ledgerRecords.forEach((r) => {
+      const isSettled =
+        r.settlementStatus === 'SETTLED' ||
+        (r as any).status === 'SETTLED' ||
+        (r as any).status === 'PAID';
+      const amt = Number(r.commission) || 0;
+      if (isSettled) {
+        settled += amt;
+        sCount++;
+      } else {
+        pending += amt;
+        pCount++;
+      }
+    });
+
+    return {
+      totalSettledAmount: settled,
+      yetToSettleAmount: pending,
+      settledCount: sCount,
+      pendingCount: pCount,
+    };
+  }, [ledgerRecords]);
+
   // Smooth Infinite Scroll Lazy Loading
   const handleScroll = useCallback(
     (event: any) => {
@@ -1606,6 +1635,47 @@ export function DistributorDashboardScreen({ navigation }: any) {
             </View>
             <Text style={styles.settlementSubheader}>PRODUCTION & PAYOUT RECORDS</Text>
 
+            {/* Settlement Overview Top Cards: Total Settled & Yet to Settle */}
+            <View style={styles.settlementSummaryHeroRow}>
+              {/* Card 1: Total Settled */}
+              <View style={styles.settlementSummaryCardSettled}>
+                <View style={styles.settlementSummaryTopRow}>
+                  <View style={styles.settlementSummaryBadgeSettled}>
+                    <CheckCircle2 size={12} color="#059669" strokeWidth={2.4} />
+                    <Text style={styles.settlementSummaryBadgeTextSettled}>CLEARED</Text>
+                  </View>
+                  <Text style={styles.settlementSummaryCountText}>{settledCount} {settledCount === 1 ? 'batch' : 'batches'}</Text>
+                </View>
+                <Text style={styles.settlementSummaryLabel}>TOTAL SETTLED</Text>
+                <Text style={styles.settlementSummaryAmountSettled}>
+                  ₹{totalSettledAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <Text style={styles.settlementSummarySubtext}>Disbursed to Bank Account</Text>
+              </View>
+
+              {/* Card 2: Yet to Settle */}
+              <View style={styles.settlementSummaryCardPending}>
+                <View style={styles.settlementSummaryTopRow}>
+                  <View style={styles.settlementSummaryBadgePending}>
+                    <Clock size={12} color="#D97706" strokeWidth={2.4} />
+                    <Text style={styles.settlementSummaryBadgeTextPending}>IN CYCLE</Text>
+                  </View>
+                  <Text style={styles.settlementSummaryCountText}>{pendingCount} {pendingCount === 1 ? 'batch' : 'batches'}</Text>
+                </View>
+                <Text style={styles.settlementSummaryLabel}>YET TO SETTLE</Text>
+                <Text style={styles.settlementSummaryAmountPending}>
+                  ₹{yetToSettleAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <Text style={styles.settlementSummarySubtext}>Scheduled at 10:00 PM EOD</Text>
+              </View>
+            </View>
+
             {/* Settlement Date Divider */}
             <View style={styles.dateDividerRow}>
               <View style={styles.dateDividerLine} />
@@ -1629,18 +1699,18 @@ export function DistributorDashboardScreen({ navigation }: any) {
                 </View>
               ) : (
                 <>
-                  {settlementDateGroups.map((group, groupIdx) => {
+                  {settlementDateGroups.map((group) => {
                     const isGroupExpanded =
                       expandedDateGroups[group.date] !== undefined
                         ? expandedDateGroups[group.date]
-                        : groupIdx === 0;
+                        : true;
 
                     return (
                       <DistributorDateSettlementGroupCard
                         key={group.date}
                         group={group}
                         isExpanded={isGroupExpanded}
-                        onToggle={() => handleToggleDateGroup(group.date, groupIdx === 0)}
+                        onToggle={() => handleToggleDateGroup(group.date, true)}
                         expandedSettlementId={expandedSettlementId}
                         onToggleSettlement={handleToggleSettlement}
                         onViewModal={setSelectedSettlementModal}
@@ -2805,6 +2875,107 @@ const styles = StyleSheet.create({
   },
   settlementList: {
     gap: 8,
+  },
+  // ── Settlement Summary Hero Cards (Total Settled vs Yet to Settle) ──
+  settlementSummaryHeroRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  settlementSummaryCardSettled: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 13,
+    borderWidth: 1.5,
+    borderColor: '#D1FAE5',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  settlementSummaryCardPending: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 13,
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  settlementSummaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  settlementSummaryBadgeSettled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3.5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6.5,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+  },
+  settlementSummaryBadgePending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3.5,
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 6.5,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+  },
+  settlementSummaryBadgeTextSettled: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: 0.3,
+  },
+  settlementSummaryBadgeTextPending: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#D97706',
+    letterSpacing: 0.3,
+  },
+  settlementSummaryCountText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  settlementSummaryLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  settlementSummaryAmountSettled: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: -0.3,
+    marginBottom: 2,
+  },
+  settlementSummaryAmountPending: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#D97706',
+    letterSpacing: -0.3,
+    marginBottom: 2,
+  },
+  settlementSummarySubtext: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#94A3B8',
   },
   settlementCard: {
     flexDirection: 'row',
