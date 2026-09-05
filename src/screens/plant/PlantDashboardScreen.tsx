@@ -1946,29 +1946,34 @@ export function PlantDashboardScreen({ navigation }: any) {
                 onPress={handleToggleSettledFilter}
                 activeOpacity={0.75}
               >
-                <View style={styles.settledIconSquircle}>
-                  <View style={styles.settledIconInnerCircle}>
-                    <Check size={13} color="#FFFFFF" strokeWidth={3} />
+                {/* Header Row: Icon Squircle + Title + Chevron */}
+                <View style={styles.settlementHeaderRow}>
+                  <View style={styles.settledIconSquircle}>
+                    <Check size={14} color="#059669" strokeWidth={2.8} />
+                  </View>
+                  <View style={styles.settlementLabelWrap}>
+                    <Text style={styles.settlementTitleText}>Settled</Text>
+                    <ChevronRight size={13} color="#94A3B8" strokeWidth={2.4} />
                   </View>
                 </View>
-                <View style={styles.settlementContentCol}>
-                  <View style={styles.settlementLabelRow}>
-                    <Text style={styles.settlementTitleText}>Settled</Text>
-                    <ChevronRight size={13} color="#64748B" strokeWidth={2.4} />
-                  </View>
-                  <Text style={styles.settlementAmountSettled}>
-                    ₹{totalSettledAmount.toLocaleString('en-IN', {
-                      minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Text>
-                  <Text style={styles.settlementMetaText}>
-                    {settledCount} {settledCount === 1 ? 'batch' : 'batches'} cleared
-                  </Text>
-                  <View style={styles.settledPill}>
-                    <Landmark size={11} color="#059669" strokeWidth={2.2} />
-                    <Text style={styles.settledPillText}>Disbursed to Bank Account</Text>
-                  </View>
+
+                {/* Amount */}
+                <Text style={styles.settlementAmountSettled} numberOfLines={1} adjustsFontSizeToFit>
+                  ₹{totalSettledAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+
+                {/* Subtext */}
+                <Text style={styles.settlementMetaText}>
+                  {settledCount} {settledCount === 1 ? 'batch' : 'batches'} cleared
+                </Text>
+
+                {/* Bottom Pill Tag */}
+                <View style={styles.settledPill}>
+                  <Landmark size={11} color="#059669" strokeWidth={2.2} />
+                  <Text style={styles.settledPillText} numberOfLines={1}>Disbursed to Bank Account</Text>
                 </View>
               </TouchableOpacity>
 
@@ -1984,27 +1989,34 @@ export function PlantDashboardScreen({ navigation }: any) {
                 onPress={handleToggleInCycleFilter}
                 activeOpacity={0.75}
               >
-                <View style={styles.pendingIconSquircle}>
-                  <Clock size={22} color="#EA580C" strokeWidth={2.4} />
-                </View>
-                <View style={styles.settlementContentCol}>
-                  <View style={styles.settlementLabelRow}>
+                {/* Header Row: Icon Squircle + Title + Chevron */}
+                <View style={styles.settlementHeaderRow}>
+                  <View style={styles.pendingIconSquircle}>
+                    <Clock size={14} color="#EA580C" strokeWidth={2.4} />
+                  </View>
+                  <View style={styles.settlementLabelWrap}>
                     <Text style={styles.settlementTitleText}>In Cycle</Text>
-                    <ChevronRight size={13} color="#64748B" strokeWidth={2.4} />
+                    <ChevronRight size={13} color="#94A3B8" strokeWidth={2.4} />
                   </View>
-                  <Text style={styles.settlementAmountPending}>
-                    ₹{yetToSettleAmount.toLocaleString('en-IN', {
-                      minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Text>
-                  <Text style={styles.settlementMetaText}>
-                    {pendingCount} {pendingCount === 1 ? 'batch' : 'batches'} pending
-                  </Text>
-                  <View style={styles.pendingPill}>
-                    <Calendar size={11} color="#D97706" strokeWidth={2.2} />
-                    <Text style={styles.pendingPillText}>Scheduled at 10:00 PM EOD</Text>
-                  </View>
+                </View>
+
+                {/* Amount */}
+                <Text style={styles.settlementAmountPending} numberOfLines={1} adjustsFontSizeToFit>
+                  ₹{yetToSettleAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+
+                {/* Subtext */}
+                <Text style={styles.settlementMetaText}>
+                  {pendingCount} {pendingCount === 1 ? 'batch' : 'batches'} pending
+                </Text>
+
+                {/* Bottom Pill Tag */}
+                <View style={styles.pendingPill}>
+                  <Calendar size={11} color="#D97706" strokeWidth={2.2} />
+                  <Text style={styles.pendingPillText} numberOfLines={1}>Scheduled at 10:00 PM EOD</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -3294,32 +3306,30 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // ── Split Interactive Settlement Summary Card (Exact Reference Design) ──
+  // ── Split Interactive Settlement Summary Card (Balanced Comforting Layout) ──
   settlementSummaryCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
     borderRadius: 22,
-    padding: 8,
+    padding: 6,
     borderWidth: 1.2,
     borderColor: '#E2E8F0',
     marginTop: 8,
     marginBottom: 16,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 2,
   },
   settlementSummaryBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: 8,
+    padding: 10,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'transparent',
+    justifyContent: 'space-between',
   },
   settlementSummaryBtnActiveSettled: {
     backgroundColor: '#F0FDF4',
@@ -3329,34 +3339,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     borderColor: '#FDE68A',
   },
+  settlementHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   settledIconSquircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  settledIconInnerCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   pendingIconSquircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
   },
-  settlementContentCol: {
-    flex: 1,
-  },
-  settlementLabelRow: {
+  settlementLabelWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
@@ -3371,21 +3380,20 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#064E3B',
     letterSpacing: -0.4,
-    marginTop: 1,
-    marginBottom: 1,
+    marginBottom: 2,
   },
   settlementAmountPending: {
     fontSize: 19,
     fontWeight: '900',
     color: '#451A03',
     letterSpacing: -0.4,
-    marginTop: 1,
-    marginBottom: 1,
+    marginBottom: 2,
   },
   settlementMetaText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '500',
     color: '#64748B',
+    marginBottom: 8,
   },
   settledPill: {
     flexDirection: 'row',
@@ -3393,9 +3401,8 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#ECFDF5',
     paddingHorizontal: 7,
-    paddingVertical: 3.5,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginTop: 7,
     alignSelf: 'flex-start',
   },
   settledPillText: {
@@ -3409,9 +3416,8 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#FFF7ED',
     paddingHorizontal: 7,
-    paddingVertical: 3.5,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginTop: 7,
     alignSelf: 'flex-start',
   },
   pendingPillText: {
@@ -3422,7 +3428,6 @@ const styles = StyleSheet.create({
   settlementSummaryDivider: {
     width: 1,
     backgroundColor: '#E2E8F0',
-    marginHorizontal: 3,
     marginVertical: 4,
   },
 
