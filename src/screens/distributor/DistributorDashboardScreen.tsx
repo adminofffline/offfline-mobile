@@ -696,15 +696,23 @@ export function DistributorDashboardScreen({ navigation }: any) {
                     key={scan.id}
                     style={styles.scanCard}
                     onPress={() => setSelectedRecord(scan)}
-                    activeOpacity={0.85}
+                    activeOpacity={0.88}
                   >
                     <View style={styles.scanCardLeft}>
-                      <Text style={styles.scanCanId}>{scan.can_id}</Text>
-                      <View style={styles.verifiedBadge}>
-                        <Text style={styles.verifiedBadgeText}>VERIFIED</Text>
+                      <View style={styles.scanCardTextWrap}>
+                        <Text style={styles.scanCanId}>{scan.can_id}</Text>
+                        <Text style={styles.scanCampaignSub} numberOfLines={1}>
+                          {scan.campaign_title} • {scan.location_name}
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.scanTime}>{scan.deliveryTime}</Text>
+                    <View style={styles.scanCardRight}>
+                      <View style={styles.appleVerifiedPill}>
+                        <View style={styles.verifiedDot} />
+                        <Text style={styles.appleVerifiedText}>Verified</Text>
+                      </View>
+                      <Text style={styles.scanTime}>{scan.deliveryTime}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))
               )}
@@ -1315,48 +1323,72 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Scans List
+  // Scans List (Apple Minimalist)
   scansList: {
-    gap: 10,
+    gap: 12,
   },
   scanCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
+    padding: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
+    borderColor: '#F1F5F9',
+    borderRadius: 18,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   scanCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    marginRight: 10,
+  },
+  scanCardTextWrap: {
+    gap: 3,
   },
   scanCanId: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  verifiedBadge: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  scanCampaignSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8E8E93',
   },
-  verifiedBadgeText: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#047857',
+  scanCardRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  appleVerifiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  verifiedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  appleVerifiedText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#059669',
   },
   scanTime: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
+    fontSize: 11.5,
+    color: '#8E8E93',
+    fontWeight: '500',
   },
 
   // Empty State

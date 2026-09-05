@@ -113,6 +113,20 @@ const RupeeBadgeIcon = ({ size = 24, color = '#7C3AED' }: { size?: number; color
   </Svg>
 );
 
+const formatCampaignTitle = (title: string) => {
+  if (!title) return 'Commercial Bottling Order';
+  const clean = String(title).trim();
+  if (clean.startsWith('REGRESSION_CAMP_')) {
+    const parts = clean.split('_');
+    const num = parts[2] || '1';
+    return `Regression Campaign #${num}`;
+  }
+  if (clean.startsWith('CMP_')) {
+    return clean.replace(/^CMP_/, '').replace(/_/g, ' ');
+  }
+  return clean;
+};
+
 interface BottlingOrder {
   id: string;
   campaign: string;
@@ -839,84 +853,101 @@ export function PlantDashboardScreen({ navigation }: any) {
               })}
             </View>
 
-            {/* ── WORK ORDERS LIST ── */}
+            {/* ── WORK ORDERS LIST (Apple Minimalist Cards) ── */}
             <View style={styles.ordersList}>
               {filteredOrders.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Droplets color="#94A3B8" size={32} />
                   <Text style={styles.emptyTitle}>No work orders match this filter</Text>
-                  <Text style={styles.emptySubtitle}>Try selecting another location pill or clicking "View All".</Text>
+                  <Text style={styles.emptySubtitle}>Try selecting another location pill or search term.</Text>
                 </View>
               ) : (
                 filteredOrders.map((order) => {
                   const isCompleted = order.status === 'COMPLETED' || order.bottledNum >= order.quantityNum;
                   const currentBottled = isCompleted ? order.quantityNum : order.bottledNum;
                   const progress = Math.min(100, Math.round((currentBottled / (order.quantityNum || 1)) * 100));
+                  const displayTitle = formatCampaignTitle(order.campaign);
 
                   return (
                     <TouchableOpacity
                       key={order.id}
                       style={styles.orderCard}
                       onPress={() => setSelectedDetailOrder(order)}
-                      activeOpacity={0.9}
+                      activeOpacity={0.88}
                     >
-                      {/* Card Header: Title & Status Badge */}
+                      {/* ── Card Header: Clean Title, Subtitle & Apple Status Pill ── */}
                       <View style={styles.cardHeaderRow}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>
-                          {order.campaign}
-                        </Text>
+                        <View style={styles.cardTitleWrap}>
+                          <Text style={styles.cardTitle} numberOfLines={1}>
+                            {displayTitle}
+                          </Text>
+                          <Text style={styles.cardSubtitle} numberOfLines={1}>
+                            {order.brand} • {order.location}
+                          </Text>
+                        </View>
                         <View
                           style={[
-                            styles.statusBadge,
-                            isCompleted ? styles.statusBadgeCompleted : styles.statusBadgePending,
+                            styles.appleStatusPill,
+                            isCompleted ? styles.appleStatusPillCompleted : styles.appleStatusPillPending,
                           ]}
                         >
+                          <View
+                            style={[
+                              styles.statusDot,
+                              isCompleted ? styles.statusDotCompleted : styles.statusDotPending,
+                            ]}
+                          />
                           <Text
                             style={[
-                              styles.statusBadgeText,
-                              isCompleted ? styles.statusBadgeTextCompleted : styles.statusBadgeTextPending,
+                              styles.appleStatusText,
+                              isCompleted ? styles.appleStatusTextCompleted : styles.appleStatusTextPending,
                             ]}
                           >
-                            {isCompleted ? 'COMPLETED' : 'PENDING'}
+                            {isCompleted ? 'Completed' : 'Pending'}
                           </Text>
                         </View>
                       </View>
 
-                      {/* Progress Bar & Counters */}
-                      {!isCompleted && (
-                        <View style={styles.progressSection}>
-                          <View style={styles.progressHeaderRow}>
-                            <Text style={styles.progressLabel}>
-                              Scanning Progress:{' '}
-                              <Text style={styles.progressLabelHighlight}>{progress}%</Text>
-                            </Text>
-                            <Text style={styles.progressCountText}>
-                              {currentBottled.toLocaleString()} / {order.quantityNum.toLocaleString()}
-                            </Text>
-                          </View>
-                          <View style={styles.progressBarTrack}>
-                            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-                          </View>
+                      {/* ── Progress Metrics & Slim Apple Progress Bar ── */}
+                      <View style={styles.progressSection}>
+                        <View style={styles.progressMetricRow}>
+                          <Text style={styles.progressPercentText}>{progress}%</Text>
+                          <Text style={styles.progressCountText}>
+                            <Text style={styles.progressCurrentCount}>{currentBottled.toLocaleString()}</Text>
+                            <Text style={styles.progressTotalCount}> / {order.quantityNum.toLocaleString()} cans</Text>
+                          </Text>
+                        </View>
+                        <View style={styles.appleProgressBarTrack}>
+                          <View
+                            style={[
+                              styles.appleProgressBarFill,
+                              { width: `${Math.max(progress, 2)}%` },
+                              isCompleted && styles.appleProgressBarFillCompleted,
+                            ]}
+                          />
+                        </View>
+                      </View>
 
-                          {/* Quick Booster Buttons (+100, +500, +5k) */}
-                          <View style={styles.boosterRow}>
-                            <Text style={styles.boosterLabel}>Scan Rate:</Text>
-                            <View style={styles.boosterBtnGroup}>
-                              {[
-                                { label: '+100', val: 100 },
-                                { label: '+500', val: 500 },
-                                { label: '+5k', val: 5000 },
-                              ].map((btn) => (
-                                <TouchableOpacity
-                                  key={btn.label}
-                                  style={styles.boosterBtn}
-                                  onPress={() => handleBoostScans(order.id, btn.val)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Text style={styles.boosterBtnText}>{btn.label}</Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
+                      {/* ── Minimalist Quick Booster Actions ── */}
+                      {!isCompleted && (
+                        <View style={styles.cardFooterRow}>
+                          <Text style={styles.cardFooterHint}>Quick Boost</Text>
+                          <View style={styles.boosterBtnGroup}>
+                            {[
+                              { label: '+100', val: 100 },
+                              { label: '+500', val: 500 },
+                              { label: '+5k', val: 5000 },
+                            ].map((btn) => (
+                              <TouchableOpacity
+                                key={btn.label}
+                                style={styles.appleBoosterBtn}
+                                onPress={() => handleBoostScans(order.id, btn.val)}
+                                activeOpacity={0.65}
+                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                              >
+                                <Text style={styles.appleBoosterBtnText}>{btn.label}</Text>
+                              </TouchableOpacity>
+                            ))}
                           </View>
                         </View>
                       )}
@@ -1619,128 +1650,150 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // ── Order Cards ──
+  // ── Apple Minimalist Order Cards ──
   ordersList: {
     gap: 12,
   },
   orderCard: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 18,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
+  },
+  cardTitleWrap: {
+    flex: 1,
+    marginRight: 10,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
+    fontSize: 15.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+    marginBottom: 3,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
+  cardSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8E8E93',
   },
-  statusBadgePending: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
-  statusBadgeCompleted: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  statusBadgeTextPending: {
-    color: '#B45309',
-  },
-  statusBadgeTextCompleted: {
-    color: '#047857',
-  },
-
-  // Progress Section
-  progressSection: {
-    marginTop: 2,
-  },
-  progressHeaderRow: {
+  appleStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+  },
+  appleStatusPillPending: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  appleStatusPillCompleted: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusDotPending: {
+    backgroundColor: '#F59E0B',
+  },
+  statusDotCompleted: {
+    backgroundColor: '#10B981',
+  },
+  appleStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  appleStatusTextPending: {
+    color: '#D97706',
+  },
+  appleStatusTextCompleted: {
+    color: '#059669',
+  },
+
+  // Apple Progress Section
+  progressSection: {
+    marginBottom: 8,
+  },
+  progressMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  progressLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  progressLabelHighlight: {
-    color: '#0891B2',
+  progressPercentText: {
+    fontSize: 13.5,
     fontWeight: '800',
+    color: '#0891B2',
   },
   progressCountText: {
-    fontSize: 11,
+    fontSize: 12,
+  },
+  progressCurrentCount: {
     fontWeight: '700',
-    color: '#4B5563',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#0F172A',
   },
-  progressBarTrack: {
-    height: 7,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
+  progressTotalCount: {
+    fontWeight: '500',
+    color: '#8E8E93',
+  },
+  appleProgressBarTrack: {
+    height: 5,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 2.5,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 10,
   },
-  progressBarFill: {
+  appleProgressBarFill: {
     height: '100%',
     backgroundColor: '#0891B2',
-    borderRadius: 4,
+    borderRadius: 2.5,
+  },
+  appleProgressBarFillCompleted: {
+    backgroundColor: '#10B981',
   },
 
-  // Boosters
-  boosterRow: {
+  // Minimalist Footer / Booster
+  cardFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    paddingTop: 10,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
   },
-  boosterLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6B7280',
+  cardFooterHint: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#94A3B8',
   },
   boosterBtnGroup: {
     flexDirection: 'row',
     gap: 6,
   },
-  boosterBtn: {
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  appleBoosterBtn: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 11,
+    paddingVertical: 4.5,
     borderRadius: 8,
   },
-  boosterBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
+  appleBoosterBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#0F172A',
   },
 
