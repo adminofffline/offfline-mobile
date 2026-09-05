@@ -160,6 +160,7 @@ const cleanLocationDisplay = (loc?: string): string => {
   return String(loc)
     .replace(/\s*\(undefined\)/gi, '')
     .replace(/\s*undefined/gi, '')
+    .replace(/WaterAds/gi, 'Offfline')
     .replace(/,\s*,/g, ',')
     .trim() || 'Chennai';
 };
@@ -2629,11 +2630,11 @@ const styles = StyleSheet.create({
   settlementAccordionContent: {
     paddingHorizontal: 14,
     paddingBottom: 14,
-    paddingTop: 10,
+    paddingTop: 12,
     backgroundColor: '#FAFCFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    gap: 10,
+    gap: 12,
   },
   settlementAccordionHeaderRow: {
     flexDirection: 'row',
@@ -2697,12 +2698,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 12,
+    padding: 14,
   },
   settlementSpecGridRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 16,
   },
   settlementSpecCol: {
     flex: 1,
@@ -2712,18 +2714,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 5,
     textTransform: 'uppercase',
   },
   settlementSpecVal: {
     fontSize: 12,
     fontWeight: '700',
     color: '#0F172A',
+    lineHeight: 16,
   },
   settlementSpecDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 8,
+    marginVertical: 12,
   },
   settlementViewStatementBtn: {
     flexDirection: 'row',
