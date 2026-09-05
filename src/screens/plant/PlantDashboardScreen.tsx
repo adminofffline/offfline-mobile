@@ -1625,20 +1625,28 @@ export function PlantDashboardScreen({ navigation }: any) {
   }, [filteredOrders, ordersLimit]);
 
   const handleToggleSettledFilter = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('impactLight');
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    LayoutAnimation.configureNext({
+      duration: 260,
+      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
     setSettlementFilter((prev) => (prev === 'SETTLED' ? 'ALL' : 'SETTLED'));
   }, []);
 
   const handleToggleInCycleFilter = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('impactLight');
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    LayoutAnimation.configureNext({
+      duration: 260,
+      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
     setSettlementFilter((prev) => (prev === 'IN_CYCLE' ? 'ALL' : 'IN_CYCLE'));
   }, []);
 
@@ -1938,22 +1946,23 @@ export function PlantDashboardScreen({ navigation }: any) {
             {/* Split Interactive Filter Card matching reference design */}
             <View style={styles.settlementSummaryCard}>
               {/* Left Column: Settled */}
-              <TouchableOpacity
+              <NativePressable
                 style={[
                   styles.settlementSummaryBtn,
                   settlementFilter === 'SETTLED' && styles.settlementSummaryBtnActiveSettled,
                 ]}
                 onPress={handleToggleSettledFilter}
-                activeOpacity={0.75}
+                scaleActive={0.96}
+                hapticType="impactLight"
               >
                 {/* Header Row: Icon Squircle + Title + Chevron */}
                 <View style={styles.settlementHeaderRow}>
-                  <View style={styles.settledIconSquircle}>
-                    <Check size={14} color="#059669" strokeWidth={2.8} />
+                  <View style={[styles.settledIconSquircle, settlementFilter === 'SETTLED' && styles.settledIconSquircleActive]}>
+                    <Check size={14} color={settlementFilter === 'SETTLED' ? '#047857' : '#059669'} strokeWidth={2.8} />
                   </View>
                   <View style={styles.settlementLabelWrap}>
-                    <Text style={styles.settlementTitleText}>Settled</Text>
-                    <ChevronRight size={13} color="#94A3B8" strokeWidth={2.4} />
+                    <Text style={[styles.settlementTitleText, settlementFilter === 'SETTLED' && styles.settlementTitleTextActiveSettled]}>Settled</Text>
+                    <ChevronRight size={13} color={settlementFilter === 'SETTLED' ? '#059669' : '#94A3B8'} strokeWidth={2.4} />
                   </View>
                 </View>
 
@@ -1971,32 +1980,33 @@ export function PlantDashboardScreen({ navigation }: any) {
                 </Text>
 
                 {/* Bottom Pill Tag */}
-                <View style={styles.settledPill}>
+                <View style={[styles.settledPill, settlementFilter === 'SETTLED' && styles.settledPillActive]}>
                   <Landmark size={11} color="#059669" strokeWidth={2.2} />
                   <Text style={styles.settledPillText} numberOfLines={1}>Disbursed to Bank Account</Text>
                 </View>
-              </TouchableOpacity>
+              </NativePressable>
 
               {/* Vertical Divider */}
               <View style={styles.settlementSummaryDivider} />
 
               {/* Right Column: In Cycle */}
-              <TouchableOpacity
+              <NativePressable
                 style={[
                   styles.settlementSummaryBtn,
                   settlementFilter === 'IN_CYCLE' && styles.settlementSummaryBtnActivePending,
                 ]}
                 onPress={handleToggleInCycleFilter}
-                activeOpacity={0.75}
+                scaleActive={0.96}
+                hapticType="impactLight"
               >
                 {/* Header Row: Icon Squircle + Title + Chevron */}
                 <View style={styles.settlementHeaderRow}>
-                  <View style={styles.pendingIconSquircle}>
-                    <Clock size={14} color="#EA580C" strokeWidth={2.4} />
+                  <View style={[styles.pendingIconSquircle, settlementFilter === 'IN_CYCLE' && styles.pendingIconSquircleActive]}>
+                    <Clock size={14} color={settlementFilter === 'IN_CYCLE' ? '#C2410C' : '#EA580C'} strokeWidth={2.4} />
                   </View>
                   <View style={styles.settlementLabelWrap}>
-                    <Text style={styles.settlementTitleText}>In Cycle</Text>
-                    <ChevronRight size={13} color="#94A3B8" strokeWidth={2.4} />
+                    <Text style={[styles.settlementTitleText, settlementFilter === 'IN_CYCLE' && styles.settlementTitleTextActivePending]}>In Cycle</Text>
+                    <ChevronRight size={13} color={settlementFilter === 'IN_CYCLE' ? '#EA580C' : '#94A3B8'} strokeWidth={2.4} />
                   </View>
                 </View>
 
@@ -2014,11 +2024,11 @@ export function PlantDashboardScreen({ navigation }: any) {
                 </Text>
 
                 {/* Bottom Pill Tag */}
-                <View style={styles.pendingPill}>
+                <View style={[styles.pendingPill, settlementFilter === 'IN_CYCLE' && styles.pendingPillActive]}>
                   <Calendar size={11} color="#D97706" strokeWidth={2.2} />
                   <Text style={styles.pendingPillText} numberOfLines={1}>Scheduled at 10:00 PM EOD</Text>
                 </View>
-              </TouchableOpacity>
+              </NativePressable>
             </View>
 
             {/* Minimalist History Section Header */}
@@ -2026,23 +2036,28 @@ export function PlantDashboardScreen({ navigation }: any) {
               <View style={styles.historySectionTitleRow}>
                 <Text style={styles.historySectionTitle}>Payout History</Text>
                 {settlementFilter !== 'ALL' && (
-                  <TouchableOpacity
+                  <NativePressable
                     style={styles.activeFilterChip}
                     onPress={() => {
-                      ReactNativeHapticFeedback.trigger('impactLight');
                       if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
                         UIManager.setLayoutAnimationEnabledExperimental(true);
                       }
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      LayoutAnimation.configureNext({
+                        duration: 260,
+                        create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+                        update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
+                        delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+                      });
                       setSettlementFilter('ALL');
                     }}
-                    activeOpacity={0.7}
+                    scaleActive={0.88}
+                    hapticType="selection"
                   >
                     <Text style={styles.activeFilterChipText}>
                       {settlementFilter === 'SETTLED' ? 'Settled only' : 'In Cycle only'}
                     </Text>
                     <X size={10} color="#475569" strokeWidth={2.4} />
-                  </TouchableOpacity>
+                  </NativePressable>
                 )}
               </View>
               <Text style={styles.historySectionMeta}>
@@ -3375,6 +3390,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
   },
+  settlementTitleTextActiveSettled: {
+    color: '#064E3B',
+  },
+  settlementTitleTextActivePending: {
+    color: '#7C2D12',
+  },
+  settledIconSquircleActive: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#6EE7B7',
+    transform: [{ scale: 1.05 }],
+  },
+  pendingIconSquircleActive: {
+    backgroundColor: '#FFEDD5',
+    borderColor: '#FDBA74',
+    transform: [{ scale: 1.05 }],
+  },
   settlementAmountSettled: {
     fontSize: 19,
     fontWeight: '900',
@@ -3405,6 +3436,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
+  settledPillActive: {
+    backgroundColor: '#D1FAE5',
+  },
   settledPillText: {
     fontSize: 9.5,
     fontWeight: '600',
@@ -3419,6 +3453,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     alignSelf: 'flex-start',
+  },
+  pendingPillActive: {
+    backgroundColor: '#FFEDD5',
   },
   pendingPillText: {
     fontSize: 9.5,
