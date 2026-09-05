@@ -803,8 +803,8 @@ const groupSettlementsByDate = (records: SettlementRecord[]): DateSettlementGrou
 
   // Sort groups descending by date
   result.sort((a, b) => {
-    const tA = new Date(a.date).getTime();
-    const tB = new Date(b.date).getTime();
+    const tA = new Date(a.date.replace(/Sept/i, 'Sep')).getTime();
+    const tB = new Date(b.date.replace(/Sept/i, 'Sep')).getTime();
     return !isNaN(tA) && !isNaN(tB) ? tB - tA : 0;
   });
 
@@ -1073,7 +1073,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         const reqId = String(req.id || req._id || req.campaign_id || `REQ_${Math.random()}`);
         const reqTitle = String(req.campaign_name || req.campaignName || req.title || 'Water Bottling Batch');
         const lowTitle = safeLower(reqTitle);
-        const rawDate = req.startDate || req.start_date || req.delivery_date || req.created_at || req.updated_at;
+        const rawDate = req.startDate || req.start_date || req.createdAt || req.created_at || req.delivery_date || req.updated_at;
         
         const matchingScanCount = Math.max(
           scanCountsByCampId.get(reqId) || 0,
@@ -1105,7 +1105,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         const campId = String(camp.id || camp._id || `CMP_${Math.random()}`);
         const campTitle = String(camp.title || camp.campaign_title || 'Commercial Batch');
         const lowTitle = safeLower(campTitle);
-        const rawDate = camp.startDate || camp.start_date || camp.created_at || camp.delivery_date || camp.updated_at;
+        const rawDate = camp.startDate || camp.start_date || camp.createdAt || camp.created_at || camp.delivery_date || camp.updated_at;
 
         if (!seenIds.has(campId) && !seenTitles.has(lowTitle)) {
           const totalTarget = Number(camp.target_sticker_count || camp.totalNum || 5000);
@@ -1165,6 +1165,18 @@ export function PlantDashboardScreen({ navigation }: any) {
       const isEodCutoffPassedToday = currentHour >= 22; // 10:00 PM EOD
       const todayStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       const todayDateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      const formatSettlementDate = (rawD?: string) => {
+        if (!rawD) return todayDateStr;
+        const str = String(rawD).trim();
+        if (/^\d{1,2}\s+[A-Za-z]{3,4}\s+\d{4}$/.test(str)) {
+          return str;
+        }
+        const d = new Date(str);
+        return !isNaN(d.getTime())
+          ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : str.replace(/^Today,\s*/i, '');
+      };
       
       const serverSettlements: SettlementRecord[] = [];
 
@@ -1191,11 +1203,8 @@ export function PlantDashboardScreen({ navigation }: any) {
           // Plant commission is ₹10.00 / can
           const parsedCommission = parsedAmount >= bCount * 5.0 ? parsedAmount : bCount * 10.00;
 
-          const rawDate = s.settlementDate || s.deliveryDate || s.created_at || s.settledAt;
-          const d = rawDate ? new Date(rawDate) : null;
-          const formattedDate = d && !isNaN(d.getTime())
-            ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-            : String(rawDate || todayDateStr).replace(/^Today,\s*/i, '');
+          const rawDate = s.settlementDate || s.deliveryDate || s.date || s.createdAt || s.created_at || s.settledAt;
+          const formattedDate = formatSettlementDate(rawDate);
 
           serverSettlements.push({
             id: String(s.id || s._id || `SET_${Math.random().toString().slice(-4)}`),
@@ -1226,9 +1235,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         const isToday = orderDateStartOfDay === todayStartOfDay;
         const isSettled = isPastDay || (isToday && isEodCutoffPassedToday) || isCompleted;
 
-        const formattedDate = d && !isNaN(d.getTime())
-          ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-          : todayDateStr;
+        const formattedDate = formatSettlementDate(ord.startDate);
 
         return {
           id: `SETTLE_PLT_${ord.id.replace(/[^a-zA-Z0-9]/g, '_').slice(-12)}_${oIdx}`,
@@ -1884,18 +1891,18 @@ export function PlantDashboardScreen({ navigation }: any) {
                 </View>
               ) : (
                 <>
-                  {settlementDateGroups.map((group, groupIdx) => {
+                  {settlementDateGroups.map((group) => {
                     const isGroupExpanded =
                       expandedDateGroups[group.date] !== undefined
                         ? expandedDateGroups[group.date]
-                        : groupIdx === 0;
+                        : true;
 
                     return (
                       <PlantDateSettlementGroupCard
                         key={group.date}
                         group={group}
                         isExpanded={isGroupExpanded}
-                        onToggle={() => handleToggleDateGroup(group.date, groupIdx === 0)}
+                        onToggle={() => handleToggleDateGroup(group.date, true)}
                         expandedSettlementId={expandedSettlementId}
                         onToggleSettlement={handleToggleSettlement}
                         onViewModal={setSelectedSettlementModal}
