@@ -1626,28 +1626,10 @@ export function PlantDashboardScreen({ navigation }: any) {
   }, [filteredOrders, ordersLimit]);
 
   const handleToggleSettledFilter = useCallback(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-    LayoutAnimation.configureNext({
-      duration: 260,
-      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-      update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
-      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-    });
     setSettlementFilter((prev) => (prev === 'SETTLED' ? 'ALL' : 'SETTLED'));
   }, []);
 
   const handleToggleInCycleFilter = useCallback(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-    LayoutAnimation.configureNext({
-      duration: 260,
-      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-      update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
-      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-    });
     setSettlementFilter((prev) => (prev === 'IN_CYCLE' ? 'ALL' : 'IN_CYCLE'));
   }, []);
 
@@ -2042,18 +2024,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                 {settlementFilter !== 'ALL' && (
                   <NativePressable
                     style={styles.activeFilterChip}
-                    onPress={() => {
-                      if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-                        UIManager.setLayoutAnimationEnabledExperimental(true);
-                      }
-                      LayoutAnimation.configureNext({
-                        duration: 260,
-                        create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-                        update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
-                        delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-                      });
-                      setSettlementFilter('ALL');
-                    }}
+                    onPress={() => setSettlementFilter('ALL')}
                     scaleActive={0.88}
                     hapticType="selection"
                   >
@@ -2083,6 +2054,18 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <Text style={styles.emptyTitle}>No settlements recorded</Text>
                   <Text style={styles.emptySubtitle}>Dispatched bottling batches will generate financial settlements here.</Text>
                 </View>
+              ) : filteredLedgerRecords.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Clock color="#94A3B8" size={30} />
+                  <Text style={styles.emptyTitle}>
+                    {settlementFilter === 'IN_CYCLE' ? 'No pending in-cycle batches' : 'No settled batches'}
+                  </Text>
+                  <Text style={styles.emptySubtitle}>
+                    {settlementFilter === 'IN_CYCLE'
+                      ? 'All completed batches have already been settled and disbursed.'
+                      : 'No settled disbursements found for this period.'}
+                  </Text>
+                </View>
               ) : (
                 <>
                   {settlementDateGroups.map((group) => {
@@ -2106,7 +2089,7 @@ export function PlantDashboardScreen({ navigation }: any) {
 
                   <View style={styles.allLoadedBadge}>
                     <Check size={13} color="#059669" />
-                    <Text style={styles.allLoadedText}>Showing all {ledgerRecords.length} {ledgerRecords.length === 1 ? 'settlement' : 'settlements'} across {settlementDateGroups.length} {settlementDateGroups.length === 1 ? 'date' : 'dates'}</Text>
+                    <Text style={styles.allLoadedText}>Showing all {filteredLedgerRecords.length} {filteredLedgerRecords.length === 1 ? 'settlement' : 'settlements'} across {settlementDateGroups.length} {settlementDateGroups.length === 1 ? 'date' : 'dates'}</Text>
                   </View>
                 </>
               )}
