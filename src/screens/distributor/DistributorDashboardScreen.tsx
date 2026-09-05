@@ -15,6 +15,8 @@ import {
   StatusBar,
   Animated,
   TouchableWithoutFeedback,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import {
   FileText,
@@ -53,6 +55,7 @@ import {
   ExternalLink,
   Printer,
   Calendar,
+  Landmark,
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
@@ -752,6 +755,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
   }, [searchQuery]);
 
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
+  const [settlementFilter, setSettlementFilter] = useState<'ALL' | 'SETTLED' | 'IN_CYCLE'>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toastData, setToastData] = useState<ToastData | string | null>(null);
@@ -1326,13 +1330,51 @@ export function DistributorDashboardScreen({ navigation }: any) {
     return filteredRecords.slice(0, scansLimit);
   }, [filteredRecords, scansLimit]);
 
+  const handleToggleSettledFilter = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('impactLight');
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSettlementFilter((prev) => (prev === 'SETTLED' ? 'ALL' : 'SETTLED'));
+  }, []);
+
+  const handleToggleInCycleFilter = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('impactLight');
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSettlementFilter((prev) => (prev === 'IN_CYCLE' ? 'ALL' : 'IN_CYCLE'));
+  }, []);
+
+  const filteredLedgerRecords = useMemo(() => {
+    if (settlementFilter === 'SETTLED') {
+      return ledgerRecords.filter(
+        (r) =>
+          r.settlementStatus === 'SETTLED' ||
+          (r as any).status === 'SETTLED' ||
+          (r as any).status === 'PAID'
+      );
+    }
+    if (settlementFilter === 'IN_CYCLE') {
+      return ledgerRecords.filter(
+        (r) =>
+          r.settlementStatus !== 'SETTLED' &&
+          (r as any).status !== 'SETTLED' &&
+          (r as any).status !== 'PAID'
+      );
+    }
+    return ledgerRecords;
+  }, [ledgerRecords, settlementFilter]);
+
   const displayedSettlements = useMemo(() => {
-    return ledgerRecords.slice(0, settlementsLimit);
-  }, [ledgerRecords, settlementsLimit]);
+    return filteredLedgerRecords.slice(0, settlementsLimit);
+  }, [filteredLedgerRecords, settlementsLimit]);
 
   const settlementDateGroups = useMemo(() => {
-    return groupSettlementsByDate(ledgerRecords);
-  }, [ledgerRecords]);
+    return groupSettlementsByDate(filteredLedgerRecords);
+  }, [filteredLedgerRecords]);
 
   const { totalSettledAmount, yetToSettleAmount, settledCount, pendingCount } = useMemo(() => {
     let settled = 0;
@@ -1631,48 +1673,106 @@ export function DistributorDashboardScreen({ navigation }: any) {
               </NativePressable>
             </View>
 
-            {/* Minimalist Split Summary Card: Settled & In Cycle */}
+            {/* Split Interactive Filter Card matching reference design */}
             <View style={styles.settlementSummaryCard}>
-              <View style={styles.settlementSummaryCol}>
-                <View style={styles.settlementSummaryLabelRow}>
-                  <View style={[styles.settlementDot, styles.settlementDotSettled]} />
-                  <Text style={styles.settlementSummaryLabel}>Settled</Text>
+              {/* Left Column: Settled */}
+              <TouchableOpacity
+                style={[
+                  styles.settlementSummaryBtn,
+                  settlementFilter === 'SETTLED' && styles.settlementSummaryBtnActiveSettled,
+                ]}
+                onPress={handleToggleSettledFilter}
+                activeOpacity={0.75}
+              >
+                <View style={styles.settledIconSquircle}>
+                  <View style={styles.settledIconInnerCircle}>
+                    <Check size={13} color="#FFFFFF" strokeWidth={3} />
+                  </View>
                 </View>
-                <Text style={styles.settlementSummaryValue}>
-                  ₹{totalSettledAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Text>
-                <Text style={styles.settlementSummaryMeta}>
-                  {settledCount} {settledCount === 1 ? 'batch' : 'batches'} cleared
-                </Text>
-              </View>
+                <View style={styles.settlementContentCol}>
+                  <View style={styles.settlementLabelRow}>
+                    <Text style={styles.settlementTitleText}>Settled</Text>
+                    <ChevronRight size={13} color="#64748B" strokeWidth={2.4} />
+                  </View>
+                  <Text style={styles.settlementAmountSettled}>
+                    ₹{totalSettledAmount.toLocaleString('en-IN', {
+                      minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Text>
+                  <Text style={styles.settlementMetaText}>
+                    {settledCount} {settledCount === 1 ? 'batch' : 'batches'} cleared
+                  </Text>
+                  <View style={styles.settledPill}>
+                    <Landmark size={11} color="#059669" strokeWidth={2.2} />
+                    <Text style={styles.settledPillText}>Disbursed to Bank Account</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
 
+              {/* Vertical Divider */}
               <View style={styles.settlementSummaryDivider} />
 
-              <View style={styles.settlementSummaryCol}>
-                <View style={styles.settlementSummaryLabelRow}>
-                  <View style={[styles.settlementDot, styles.settlementDotPending]} />
-                  <Text style={styles.settlementSummaryLabel}>In Cycle</Text>
+              {/* Right Column: In Cycle */}
+              <TouchableOpacity
+                style={[
+                  styles.settlementSummaryBtn,
+                  settlementFilter === 'IN_CYCLE' && styles.settlementSummaryBtnActivePending,
+                ]}
+                onPress={handleToggleInCycleFilter}
+                activeOpacity={0.75}
+              >
+                <View style={styles.pendingIconSquircle}>
+                  <Clock size={22} color="#EA580C" strokeWidth={2.4} />
                 </View>
-                <Text style={styles.settlementSummaryValue}>
-                  ₹{yetToSettleAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Text>
-                <Text style={styles.settlementSummaryMeta}>
-                  {pendingCount} {pendingCount === 1 ? 'batch' : 'batches'} pending
-                </Text>
-              </View>
+                <View style={styles.settlementContentCol}>
+                  <View style={styles.settlementLabelRow}>
+                    <Text style={styles.settlementTitleText}>In Cycle</Text>
+                    <ChevronRight size={13} color="#64748B" strokeWidth={2.4} />
+                  </View>
+                  <Text style={styles.settlementAmountPending}>
+                    ₹{yetToSettleAmount.toLocaleString('en-IN', {
+                      minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Text>
+                  <Text style={styles.settlementMetaText}>
+                    {pendingCount} {pendingCount === 1 ? 'batch' : 'batches'} pending
+                  </Text>
+                  <View style={styles.pendingPill}>
+                    <Calendar size={11} color="#D97706" strokeWidth={2.2} />
+                    <Text style={styles.pendingPillText}>Scheduled at 10:00 PM EOD</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* Minimalist History Section Header */}
             <View style={styles.historySectionHeader}>
-              <Text style={styles.historySectionTitle}>Payout History</Text>
+              <View style={styles.historySectionTitleRow}>
+                <Text style={styles.historySectionTitle}>Payout History</Text>
+                {settlementFilter !== 'ALL' && (
+                  <TouchableOpacity
+                    style={styles.activeFilterChip}
+                    onPress={() => {
+                      ReactNativeHapticFeedback.trigger('impactLight');
+                      if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+                        UIManager.setLayoutAnimationEnabledExperimental(true);
+                      }
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setSettlementFilter('ALL');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.activeFilterChipText}>
+                      {settlementFilter === 'SETTLED' ? 'Settled only' : 'In Cycle only'}
+                    </Text>
+                    <X size={10} color="#475569" strokeWidth={2.4} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.historySectionMeta}>
-                {ledgerRecords.length} {ledgerRecords.length === 1 ? 'entry' : 'entries'}
+                {filteredLedgerRecords.length} {filteredLedgerRecords.length === 1 ? 'entry' : 'entries'}
               </Text>
             </View>
 
@@ -2843,67 +2943,136 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
   },
-  // ── Minimalist Settlement Summary Card (Settled vs In Cycle) ──
+  // ── Split Interactive Settlement Summary Card (Exact Reference Design) ──
   settlementSummaryCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
+    borderRadius: 22,
+    padding: 8,
+    borderWidth: 1.2,
     borderColor: '#E2E8F0',
     marginTop: 8,
     marginBottom: 16,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  settlementSummaryCol: {
+  settlementSummaryBtn: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  settlementSummaryBtnActiveSettled: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
+  },
+  settlementSummaryBtnActivePending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  settledIconSquircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settledIconInnerCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingIconSquircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settlementContentCol: {
+    flex: 1,
+  },
+  settlementLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  settlementTitleText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  settlementAmountSettled: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#064E3B',
+    letterSpacing: -0.4,
+    marginTop: 1,
+    marginBottom: 1,
+  },
+  settlementAmountPending: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#451A03',
+    letterSpacing: -0.4,
+    marginTop: 1,
+    marginBottom: 1,
+  },
+  settlementMetaText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  settledPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    marginTop: 7,
+    alignSelf: 'flex-start',
+  },
+  settledPillText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  pendingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    marginTop: 7,
+    alignSelf: 'flex-start',
+  },
+  pendingPillText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#D97706',
   },
   settlementSummaryDivider: {
     width: 1,
-    height: 42,
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 14,
-  },
-  settlementSummaryLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  settlementDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  settlementDotSettled: {
-    backgroundColor: '#10B981',
-  },
-  settlementDotPending: {
-    backgroundColor: '#F59E0B',
-  },
-  settlementSummaryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-    letterSpacing: 0.2,
-  },
-  settlementSummaryValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  settlementSummaryMeta: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#94A3B8',
-    marginTop: 2,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 3,
+    marginVertical: 4,
   },
 
   // ── Settlement History Header ──
@@ -2914,11 +3083,30 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 2,
   },
+  historySectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   historySectionTitle: {
     fontSize: 13.5,
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+  },
+  activeFilterChipText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#475569',
   },
   historySectionMeta: {
     fontSize: 11.5,
