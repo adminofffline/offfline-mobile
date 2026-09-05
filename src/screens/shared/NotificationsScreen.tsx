@@ -4,15 +4,15 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   RefreshControl,
   SafeAreaView,
 } from 'react-native';
-import { Bell, ArrowLeft, CheckCheck, Clock, CheckCircle2, Factory, Truck } from 'lucide-react-native';
+import { Bell, ArrowLeft, CheckCheck } from 'lucide-react-native';
 import { notificationsApi } from '../../api/notifications';
 import { InAppNotification } from '../../types';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import { formatDateShort } from '../../utils/formatters';
+import { NativePressable } from '../../components/common/NativePressable';
 
 interface NotificationsScreenProps {
   navigation: any;
@@ -23,12 +23,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
   const [filter, setFilter] = useState<'ALL' | 'UNREAD'>('ALL');
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const res = await notificationsApi.getNotifications({
-        unread_only: filter === 'UNREAD',
-      });
+      const res = await notificationsApi.getNotifications(
+        { unread_only: filter === 'UNREAD' },
+        forceRefresh
+      );
       const list = res.data?.notifications || [];
       setNotifications(list);
     } catch (e) {
@@ -63,45 +64,51 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
+          <NativePressable
             style={styles.backBtn}
             onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
+            haptic="impactLight"
+            hitSlop={8}
           >
             <ArrowLeft size={18} color={COLORS.slate700} />
-          </TouchableOpacity>
+          </NativePressable>
           <View style={styles.headerTitleBox}>
             <Text style={styles.headerTitle}>Notifications Center</Text>
             <Text style={styles.headerSubtitle}>Real-time bottling & delivery alerts</Text>
           </View>
-          <TouchableOpacity
+          <NativePressable
             style={styles.markAllBtn}
             onPress={handleMarkAllRead}
-            activeOpacity={0.7}
+            haptic="impactLight"
+            hitSlop={8}
           >
             <CheckCheck size={16} color={COLORS.distributorAccent} />
-          </TouchableOpacity>
+          </NativePressable>
         </View>
 
         {/* Filter Tabs */}
         <View style={styles.tabRow}>
-          <TouchableOpacity
+          <NativePressable
             style={[styles.tabBtn, filter === 'ALL' && styles.tabBtnActive]}
             onPress={() => setFilter('ALL')}
+            haptic="selection"
+            scaleActive={0.96}
           >
             <Text style={[styles.tabBtnText, filter === 'ALL' && styles.tabBtnTextActive]}>
               All Notifications
             </Text>
-          </TouchableOpacity>
+          </NativePressable>
 
-          <TouchableOpacity
+          <NativePressable
             style={[styles.tabBtn, filter === 'UNREAD' && styles.tabBtnActive]}
             onPress={() => setFilter('UNREAD')}
+            haptic="selection"
+            scaleActive={0.96}
           >
             <Text style={[styles.tabBtnText, filter === 'UNREAD' && styles.tabBtnTextActive]}>
               Unread
             </Text>
-          </TouchableOpacity>
+          </NativePressable>
         </View>
 
         {/* Notifications List */}
@@ -109,14 +116,15 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
           data={notifications}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={loadNotifications} />
+            <RefreshControl refreshing={isLoading} onRefresh={() => loadNotifications(true)} />
           }
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <NativePressable
               style={[styles.notifCard, !item.is_read && styles.notifCardUnread]}
               onPress={() => handleMarkRead(item.id)}
-              activeOpacity={0.8}
+              haptic="selection"
+              scaleActive={0.985}
             >
               <View style={styles.notifLeft}>
                 <View
@@ -141,7 +149,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
                   <Text style={styles.notifLocation}>📍 {item.location_name}</Text>
                 )}
               </View>
-            </TouchableOpacity>
+            </NativePressable>
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
