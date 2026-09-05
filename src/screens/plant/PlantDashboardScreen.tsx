@@ -254,7 +254,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   iconBgColor,
   unitText,
   unitTextColor = '#64748B',
-  unitBgColor = 'rgba(241, 245, 249, 0.9)',
+  unitBgColor = '#F1F5F9',
   value,
   label,
   delay = 0,
@@ -263,21 +263,21 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
 }) => {
   const pressScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(12)).current;
+  const slideAnim = useRef(new Animated.Value(8)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 340,
+        duration: 280,
         delay,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
-        tension: 50,
+        tension: 60,
         delay,
         useNativeDriver: true,
       }),
@@ -287,7 +287,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   // Pulse effect when number value changes
   useEffect(() => {
     if (!loading) {
-      pulseAnim.setValue(1.06);
+      pulseAnim.setValue(1.04);
       Animated.spring(pulseAnim, {
         toValue: 1,
         friction: 5,
@@ -300,8 +300,8 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   const handlePressIn = () => {
     if (loading) return;
     Animated.timing(pressScale, {
-      toValue: 0.96,
-      duration: 100,
+      toValue: 0.97,
+      duration: 80,
       useNativeDriver: true,
     }).start();
   };
@@ -311,7 +311,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
     Animated.spring(pressScale, {
       toValue: 1,
       friction: 6,
-      tension: 120,
+      tension: 140,
       useNativeDriver: true,
     }).start();
   };
@@ -348,8 +348,8 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         <View style={styles.tileHeaderRow}>
           {loading ? (
             <>
-              <ShimmerBlock style={{ width: 32, height: 32 }} borderRadius={10} />
-              <ShimmerBlock style={{ width: 44, height: 20 }} borderRadius={8} />
+              <ShimmerBlock style={{ width: 28, height: 28 }} borderRadius={8} />
+              <ShimmerBlock style={{ width: 38, height: 18 }} borderRadius={6} />
             </>
           ) : (
             <>
@@ -368,13 +368,14 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         {/* Big Apple Bold Counter */}
         <View style={styles.tileCounterWrap}>
           {loading ? (
-            <ShimmerBlock style={{ width: 68, height: 20 }} borderRadius={6} />
+            <ShimmerBlock style={{ width: 68, height: 20 }} borderRadius={5} />
           ) : (
             <Animated.Text
               style={[
                 styles.tileCounter,
                 { transform: [{ scale: pulseAnim }] },
-                String(value).length > 7 && { fontSize: 16 },
+                String(value).length > 8 && { fontSize: 16 },
+                String(value).length > 6 && String(value).length <= 8 && { fontSize: 18 },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -387,9 +388,9 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         {/* Label Row */}
         <View style={styles.tileLabelWrap}>
           {loading ? (
-            <ShimmerBlock style={{ width: '80%', height: 10 }} borderRadius={3} />
+            <ShimmerBlock style={{ width: '80%', height: 11 }} borderRadius={3} />
           ) : (
-            <Text style={styles.tileLabel} numberOfLines={2}>
+            <Text style={styles.tileLabel} numberOfLines={1} ellipsizeMode="tail">
               {label}
             </Text>
           )}
@@ -1784,10 +1785,11 @@ export function PlantDashboardScreen({ navigation }: any) {
               {/* 1. Active Work Orders */}
               <AnimatedGlassMetricTile
                 loading={loading}
-                icon={<DocSheetIcon size={16} color="#2563EB" />}
+                icon={<DocSheetIcon size={15} color="#2563EB" />}
                 iconBgColor="#EFF6FF"
                 unitText="Jobs"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={activeJobsCount}
                 label="Active Work Orders"
                 delay={0}
@@ -1796,10 +1798,11 @@ export function PlantDashboardScreen({ navigation }: any) {
               {/* 2. Bottles In Production */}
               <AnimatedGlassMetricTile
                 loading={loading}
-                icon={<BottleBadgeIcon size={17} color="#056B4A" />}
+                icon={<BottleBadgeIcon size={16} color="#056B4A" />}
                 iconBgColor="#ECF7F2"
                 unitText="Cans"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={inProductionCans.toLocaleString('en-IN')}
                 label="Bottles In Production"
                 delay={60}
@@ -1811,10 +1814,11 @@ export function PlantDashboardScreen({ navigation }: any) {
               {/* 3. Bottled / Dispatched */}
               <AnimatedGlassMetricTile
                 loading={loading}
-                icon={<TruckBadgeIcon size={16} color="#16A34A" />}
+                icon={<TruckBadgeIcon size={15} color="#16A34A" />}
                 iconBgColor="#F0FDF4"
                 unitText="Cans"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={bottledDispatchedCans.toLocaleString('en-IN')}
                 label="Bottled / Dispatched"
                 delay={120}
@@ -1823,11 +1827,11 @@ export function PlantDashboardScreen({ navigation }: any) {
               {/* 4. Bottling Commission */}
               <AnimatedGlassMetricTile
                 loading={loading}
-                icon={<RupeeBadgeIcon size={16} color="#7C3AED" />}
+                icon={<RupeeBadgeIcon size={15} color="#7C3AED" />}
                 iconBgColor="#F5F3FF"
-                unitText="@ ₹10.00/can"
+                unitText="₹10 / can"
                 unitTextColor="#7C3AED"
-                unitBgColor="rgba(245, 243, 255, 0.95)"
+                unitBgColor="#F5F3FF"
                 value={`₹${bottlingCommissionTotal.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`}
                 label="Bottling Commission"
                 delay={180}
@@ -2906,31 +2910,30 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 
-  // ── Unified Apple Liquid Glass Master Metrics Card ──
+  // ── Unified Master Metrics Card ──
   unifiedGlassMasterCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 12,
-    borderWidth: 1.2,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 14,
     marginTop: 2,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
     gap: 10,
     overflow: 'hidden',
-    position: 'relative',
   },
   glassCardSpecularShine: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -2941,24 +2944,24 @@ const styles = StyleSheet.create({
   },
   glassMetricTile: {
     flex: 1,
-    height: 108,
+    height: 102,
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 14,
+    padding: 11,
     borderWidth: 1,
-    borderColor: '#EEF2F6',
+    borderColor: '#F1F5F9',
     justifyContent: 'space-between',
   },
   tileHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 32,
+    height: 28,
   },
   tileIconSquircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2975,38 +2978,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
   tileUnitPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tileUnitText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    letterSpacing: -0.1,
+    letterSpacing: -0.2,
   },
   tileCounterWrap: {
-    height: 26,
+    height: 24,
     justifyContent: 'center',
   },
   tileCounter: {
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   tileLabelWrap: {
-    height: 26,
-    justifyContent: 'flex-start',
+    height: 16,
+    justifyContent: 'center',
   },
   tileLabel: {
     fontSize: 11.5,
     fontWeight: '600',
     color: '#64748B',
-    lineHeight: 14.5,
     letterSpacing: -0.1,
   },
 

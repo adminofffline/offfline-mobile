@@ -229,7 +229,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   iconBgColor,
   unitText,
   unitTextColor = '#64748B',
-  unitBgColor = 'rgba(241, 245, 249, 0.9)',
+  unitBgColor = '#F1F5F9',
   value,
   label,
   delay = 0,
@@ -238,21 +238,21 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
 }) => {
   const pressScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(12)).current;
+  const slideAnim = useRef(new Animated.Value(8)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 340,
+        duration: 280,
         delay,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
-        tension: 50,
+        tension: 60,
         delay,
         useNativeDriver: true,
       }),
@@ -262,7 +262,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   // Pulse effect when number value changes
   useEffect(() => {
     if (!loading) {
-      pulseAnim.setValue(1.06);
+      pulseAnim.setValue(1.04);
       Animated.spring(pulseAnim, {
         toValue: 1,
         friction: 5,
@@ -275,8 +275,8 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
   const handlePressIn = () => {
     if (loading) return;
     Animated.timing(pressScale, {
-      toValue: 0.96,
-      duration: 100,
+      toValue: 0.97,
+      duration: 80,
       useNativeDriver: true,
     }).start();
   };
@@ -286,7 +286,7 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
     Animated.spring(pressScale, {
       toValue: 1,
       friction: 6,
-      tension: 120,
+      tension: 140,
       useNativeDriver: true,
     }).start();
   };
@@ -323,8 +323,8 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         <View style={styles.tileHeaderRow}>
           {loading ? (
             <>
-              <ShimmerBlock style={{ width: 32, height: 32 }} borderRadius={10} />
-              <ShimmerBlock style={{ width: 44, height: 20 }} borderRadius={7} />
+              <ShimmerBlock style={{ width: 28, height: 28 }} borderRadius={8} />
+              <ShimmerBlock style={{ width: 38, height: 18 }} borderRadius={6} />
             </>
           ) : (
             <>
@@ -343,13 +343,14 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         {/* Big Apple Bold Counter */}
         <View style={styles.tileCounterWrap}>
           {loading ? (
-            <ShimmerBlock style={{ width: 70, height: 22 }} borderRadius={5} />
+            <ShimmerBlock style={{ width: 68, height: 20 }} borderRadius={5} />
           ) : (
             <Animated.Text
               style={[
                 styles.tileCounter,
                 { transform: [{ scale: pulseAnim }] },
-                String(value).length > 7 && { fontSize: 16 },
+                String(value).length > 8 && { fontSize: 16 },
+                String(value).length > 6 && String(value).length <= 8 && { fontSize: 18 },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -362,9 +363,9 @@ const AnimatedGlassMetricTileComponent: React.FC<AnimatedGlassMetricTileProps> =
         {/* Label Row */}
         <View style={styles.tileLabelWrap}>
           {loading ? (
-            <ShimmerBlock style={{ width: '85%', height: 13 }} borderRadius={4} />
+            <ShimmerBlock style={{ width: '80%', height: 11 }} borderRadius={3} />
           ) : (
-            <Text style={styles.tileLabel} numberOfLines={2}>
+            <Text style={styles.tileLabel} numberOfLines={1} ellipsizeMode="tail">
               {label}
             </Text>
           )}
@@ -1497,10 +1498,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
             <View style={styles.metricsGridRow}>
               {/* 1. Active Orders */}
               <AnimatedGlassMetricTile
-                icon={<DocSheetIcon size={17} color="#2563EB" />}
+                icon={<DocSheetIcon size={15} color="#2563EB" />}
                 iconBgColor="#EFF6FF"
                 unitText="Batches"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={uniqueCampaignsCount}
                 label="Active Orders"
                 delay={0}
@@ -1509,10 +1511,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
               {/* 2. Delivered Bottles */}
               <AnimatedGlassMetricTile
-                icon={<BottleBadgeIcon size={18} color="#0891B2" />}
+                icon={<BottleBadgeIcon size={16} color="#0891B2" />}
                 iconBgColor="#ECFEFF"
                 unitText="Cans"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={scans.length.toLocaleString('en-IN')}
                 label="Delivered Bottles"
                 delay={60}
@@ -1524,10 +1527,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
             <View style={styles.metricsGridRow}>
               {/* 3. Active Routes */}
               <AnimatedGlassMetricTile
-                icon={<TruckBadgeIcon size={17} color="#16A34A" />}
+                icon={<TruckBadgeIcon size={15} color="#16A34A" />}
                 iconBgColor="#F0FDF4"
                 unitText="Routes"
-                unitTextColor="#64748B"
+                unitTextColor="#475569"
+                unitBgColor="#F1F5F9"
                 value={uniqueRoutesCount}
                 label="Active Routes"
                 delay={120}
@@ -1536,11 +1540,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
               {/* 4. Distribution Commission */}
               <AnimatedGlassMetricTile
-                icon={<RupeeBadgeIcon size={17} color="#7C3AED" />}
+                icon={<RupeeBadgeIcon size={15} color="#7C3AED" />}
                 iconBgColor="#F5F3FF"
-                unitText="@ ₹10.00/can"
+                unitText="₹10 / can"
                 unitTextColor="#7C3AED"
-                unitBgColor="rgba(245, 243, 255, 0.95)"
+                unitBgColor="#F5F3FF"
                 value={`₹${(scans.length * 10.00).toLocaleString('en-IN', { maximumFractionDigits: 1 })}`}
                 label="Commission Earned"
                 delay={180}
@@ -2618,7 +2622,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
 
-  // ── Unified Apple Liquid Glass Master Metrics Card ──
+  // ── Unified Master Metrics Card ──
   unifiedGlassMasterCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -2629,20 +2633,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 1,
     gap: 10,
     overflow: 'hidden',
-    position: 'relative',
   },
   glassCardSpecularShine: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -2653,10 +2656,10 @@ const styles = StyleSheet.create({
   },
   glassMetricTile: {
     flex: 1,
-    height: 108,
+    height: 102,
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 14,
+    padding: 11,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     justifyContent: 'space-between',
@@ -2665,12 +2668,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 32,
+    height: 28,
   },
   tileIconSquircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2687,38 +2690,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
   tileUnitPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tileUnitText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    letterSpacing: -0.1,
+    letterSpacing: -0.2,
   },
   tileCounterWrap: {
-    height: 26,
+    height: 24,
     justifyContent: 'center',
   },
   tileCounter: {
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   tileLabelWrap: {
-    height: 28,
-    justifyContent: 'flex-start',
+    height: 16,
+    justifyContent: 'center',
   },
   tileLabel: {
     fontSize: 11.5,
     fontWeight: '600',
     color: '#64748B',
-    lineHeight: 14.5,
     letterSpacing: -0.1,
   },
 
