@@ -70,7 +70,7 @@ import { OffflineBrandWordmark } from '../../components/common/OffflineBrandWord
 import { AppleCelebrationToast, ToastData } from '../../components/common/AppleCelebrationToast';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(64, Math.floor((width - 48) / 4));
 
 // ── Custom Pixel-Perfect SVG Icons (Apple Minimalist Redesign) ──
@@ -3836,16 +3836,20 @@ const styles = StyleSheet.create({
   },
   bottomSheetCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingTop: 12,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingTop: 8,
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
+    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
+    minHeight: SCREEN_HEIGHT + 100,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.16,
-    shadowRadius: 32,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
     elevation: 25,
     overflow: 'hidden',
   },
