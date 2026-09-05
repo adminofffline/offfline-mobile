@@ -70,7 +70,7 @@ import { OffflineBrandWordmark } from '../../components/common/OffflineBrandWord
 import { AppleCelebrationToast, ToastData } from '../../components/common/AppleCelebrationToast';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
-const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(64, Math.floor((width - 48) / 4));
 
 // ── Custom Pixel-Perfect SVG Icons (Apple Minimalist Redesign) ──
@@ -480,26 +480,8 @@ const PlantOrderCardItem = React.memo(({
 }) => {
   const isCompleted = order.status === 'COMPLETED' || order.bottledNum >= order.quantityNum;
   const currentBottled = isCompleted ? order.quantityNum : order.bottledNum;
-  const progress = Math.min(100, Math.round((currentBottled / (order.quantityNum || 1)) * 100));
+  const progress = Math.min(100, Math.max(0, Math.round((currentBottled / (order.quantityNum || 1)) * 100)));
   const displayTitle = formatCampaignTitle(order.campaign);
-
-  // Smooth fluid spring animation for progress bar
-  const animatedProgress = useRef(new Animated.Value(progress)).current;
-
-  useEffect(() => {
-    Animated.spring(animatedProgress, {
-      toValue: progress,
-      friction: 8,
-      tension: 45,
-      useNativeDriver: false,
-    }).start();
-  }, [progress]);
-
-  const progressWidth = animatedProgress.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%'],
-    extrapolate: 'clamp',
-  });
 
   return (
     <NativePressable
@@ -561,10 +543,10 @@ const PlantOrderCardItem = React.memo(({
           {progress === 0 ? (
             <View style={styles.appleProgressBarZeroDot} />
           ) : (
-            <Animated.View
+            <View
               style={[
                 styles.appleProgressBarFill,
-                { width: progressWidth },
+                { width: `${progress}%` },
                 isCompleted && styles.appleProgressBarFillCompleted,
               ]}
             />
@@ -739,8 +721,9 @@ const PlantSettlementCardItem = React.memo(({
 
 export function PlantDashboardScreen({ navigation }: any) {
   const { user, signOut, refreshProfile } = useAuth();
-  const { location } = useLocation();
+  const { getLocationSnapshot } = useLocation();
   const currentUser = user;
+  const isScanningRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<'work-orders' | 'settlement-report'>('work-orders');
 
@@ -1047,26 +1030,29 @@ export function PlantDashboardScreen({ navigation }: any) {
   // ── Real Camera & Vision Code Burst Scanner Handlers (Web Parity) ──
   const handleRealQrScanned = useCallback(
     async (scannedCode: string) => {
-      const activeCamp = selectedScanCampaign || orders[0];
-      const cleanQr = extractCleanQrId(scannedCode);
-      if (!cleanQr) return;
-
-      const coords = location
-        ? { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy }
-        : resolveLocationGps(activeCamp?.location || currentLocationDisplay);
-
-      const scanPayload = {
-        qr_id: cleanQr,
-        campaign_id: activeCamp?.id || 'CMP_GEN_1',
-        plant_id: activeCamp?.plant_id || (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
-        plant_name: (activeCamp as any)?.plant_name || plantProfileName || currentUser?.fullName || 'Water Plant Facility',
-        location_name: activeCamp?.location || currentLocationDisplay,
-        latitude: coords.latitude || 13.0827,
-        longitude: coords.longitude || 80.2707,
-        accuracy: coords.accuracy || 5.0,
-      };
-
+      if (isScanningRef.current) return;
+      isScanningRef.current = true;
       try {
+        const activeCamp = selectedScanCampaign || orders[0];
+        const cleanQr = extractCleanQrId(scannedCode);
+        if (!cleanQr) return;
+
+        const snapshotLoc = getLocationSnapshot();
+        const coords = snapshotLoc
+          ? { latitude: snapshotLoc.latitude, longitude: snapshotLoc.longitude, accuracy: snapshotLoc.accuracy }
+          : resolveLocationGps(activeCamp?.location || currentLocationDisplay);
+
+        const scanPayload = {
+          qr_id: cleanQr,
+          campaign_id: activeCamp?.id || 'CMP_GEN_1',
+          plant_id: activeCamp?.plant_id || (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
+          plant_name: (activeCamp as any)?.plant_name || plantProfileName || currentUser?.fullName || 'Water Plant Facility',
+          location_name: activeCamp?.location || currentLocationDisplay,
+          latitude: coords.latitude || 13.0827,
+          longitude: coords.longitude || 80.2707,
+          accuracy: coords.accuracy || 5.0,
+        };
+
         const res = await plantApi.scanQr(scanPayload);
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
@@ -1125,16 +1111,18 @@ export function PlantDashboardScreen({ navigation }: any) {
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
         if (isDup) {
-          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already recorded!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
         }
 
         const errMsg = err?.response?.data?.message || 'Scan verification failed';
         triggerToast(`❌ ${errMsg}`);
         throw err;
+      } finally {
+        isScanningRef.current = false;
       }
     },
-    [selectedScanCampaign, orders, currentUser, plantProfileName, location, currentLocationDisplay, bottledDispatchedCans]
+    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, bottledDispatchedCans]
   );
 
   const handleSimulateBulkPlant = useCallback(
@@ -3836,20 +3824,16 @@ const styles = StyleSheet.create({
   },
   bottomSheetCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingTop: 8,
+    borderRadius: 28,
+    paddingTop: 12,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    minHeight: SCREEN_HEIGHT + 100,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    paddingBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
     elevation: 25,
     overflow: 'hidden',
   },

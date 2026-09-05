@@ -72,7 +72,7 @@ import { OffflineBrandWordmark } from '../../components/common/OffflineBrandWord
 import { AppleCelebrationToast, ToastData } from '../../components/common/AppleCelebrationToast';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
-const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(64, Math.floor((width - 48) / 4));
 
 // ── Custom Pixel-Perfect SVG Icons (Apple Minimalist Redesign) ──
@@ -600,8 +600,9 @@ const DistributorSettlementCardItem = React.memo(({
 
 export function DistributorDashboardScreen({ navigation }: any) {
   const { user, signOut, refreshProfile } = useAuth();
-  const { location } = useLocation();
+  const { getLocationSnapshot } = useLocation();
   const currentUser = user;
+  const isScanningRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<'scan-reports' | 'settlement-report'>('scan-reports');
 
@@ -790,22 +791,25 @@ export function DistributorDashboardScreen({ navigation }: any) {
   // ── Real Camera & Vision Code Burst Scanner Handlers (Web Parity) ──
   const handleRealQrScanned = useCallback(
     async (scannedCode: string) => {
-      const cleanQr = extractCleanQrId(scannedCode);
-      if (!cleanQr) return;
-
-      const coords = location
-        ? { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy }
-        : resolveLocationGps(profileAddress || 'Chennai Central Hub');
-
-      const scanPayload = {
-        qr_id: cleanQr,
-        campaign_id: 'CMP_LIVE_DIST_1',
-        latitude: coords.latitude || 13.0827,
-        longitude: coords.longitude || 80.2707,
-        accuracy: coords.accuracy || 5.0,
-      };
-
+      if (isScanningRef.current) return;
+      isScanningRef.current = true;
       try {
+        const cleanQr = extractCleanQrId(scannedCode);
+        if (!cleanQr) return;
+
+        const snapshotLoc = getLocationSnapshot();
+        const coords = snapshotLoc
+          ? { latitude: snapshotLoc.latitude, longitude: snapshotLoc.longitude, accuracy: snapshotLoc.accuracy }
+          : resolveLocationGps(profileAddress || 'Chennai Central Hub');
+
+        const scanPayload = {
+          qr_id: cleanQr,
+          campaign_id: 'CMP_LIVE_DIST_1',
+          latitude: coords.latitude || 13.0827,
+          longitude: coords.longitude || 80.2707,
+          accuracy: coords.accuracy || 5.0,
+        };
+
         const res = await distributorApi.scanQr(scanPayload);
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
@@ -872,7 +876,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
         if (isDup) {
-          const canId = cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`;
+          const canId = scannedCode.startsWith('CAN-') ? scannedCode : `CAN-${scannedCode.slice(-6).toUpperCase()}`;
           const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const dupScan: ScanRecord = {
             id: `SCN_DUP_${Date.now()}_${Math.random()}`,
@@ -884,16 +888,18 @@ export function DistributorDashboardScreen({ navigation }: any) {
             status: 'ALREADY_SCANNED',
           };
           setScans((prev) => [dupScan, ...prev]);
-          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already delivered!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already delivered!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
         }
 
         const errMsg = err?.response?.data?.message || 'Delivery scan verification failed';
         triggerToast(`❌ ${errMsg}`);
         throw err;
+      } finally {
+        isScanningRef.current = false;
       }
     },
-    [location, profileAddress]
+    [getLocationSnapshot, profileAddress]
   );
 
   const handleSimulateBulkDistributor = useCallback(
@@ -3491,20 +3497,16 @@ const styles = StyleSheet.create({
   },
   bottomSheetCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingTop: 8,
+    borderRadius: 28,
+    paddingTop: 12,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    minHeight: SCREEN_HEIGHT + 100,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    paddingBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
     elevation: 25,
     overflow: 'hidden',
   },

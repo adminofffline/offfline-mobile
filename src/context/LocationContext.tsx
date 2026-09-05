@@ -11,6 +11,7 @@ interface LocationContextType {
   error: string | null;
   requestPermission: () => Promise<boolean>;
   getCurrentPosition: () => Promise<GpsCoordinates | null>;
+  getLocationSnapshot: () => GpsCoordinates;
 }
 
 const LocationContext = createContext<LocationContextType>({} as LocationContextType);
@@ -20,6 +21,18 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [isAcquiring, setIsAcquiring] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Cached memory reference for 0ms instantaneous lookup
+  const lastKnownLocationRef = useRef<GpsCoordinates>({
+    latitude: CONFIG.DEFAULT_LOCATION.latitude,
+    longitude: CONFIG.DEFAULT_LOCATION.longitude,
+    accuracy: CONFIG.DEFAULT_LOCATION.accuracy,
+    timestamp: Date.now(),
+  });
+
+  const getLocationSnapshot = useCallback((): GpsCoordinates => {
+    return lastKnownLocationRef.current;
+  }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
@@ -62,14 +75,6 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return false;
     }
   }, []);
-
-  // Cached memory reference for 0ms instantaneous lookup
-  const lastKnownLocationRef = useRef<GpsCoordinates>({
-    latitude: CONFIG.DEFAULT_LOCATION.latitude,
-    longitude: CONFIG.DEFAULT_LOCATION.longitude,
-    accuracy: CONFIG.DEFAULT_LOCATION.accuracy,
-    timestamp: Date.now(),
-  });
 
   const getCurrentPosition = useCallback(async (): Promise<GpsCoordinates | null> => {
     // If we have fresh cached location within last 60 seconds, return immediately (0ms delay)
@@ -139,7 +144,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
         );
 
-        // Keep position warm in background with low battery impact
+        // Keep position warm in background with low battery impact & distance thresholding
         watchId = Geolocation.watchPosition(
           (pos) => {
             const coords: GpsCoordinates = {
@@ -148,11 +153,21 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               accuracy: pos.coords.accuracy || 5,
               timestamp: pos.timestamp || Date.now(),
             };
+            const prev = lastKnownLocationRef.current;
             lastKnownLocationRef.current = coords;
-            setLocation(coords);
+
+            // Only trigger state re-renders if position changed significantly (> 0.0005 deg ~ 50m)
+            const hasMoved =
+              !prev ||
+              Math.abs(prev.latitude - coords.latitude) > 0.0005 ||
+              Math.abs(prev.longitude - coords.longitude) > 0.0005;
+
+            if (hasMoved) {
+              setLocation(coords);
+            }
           },
           () => {},
-          { distanceFilter: 25, interval: 15000, fastestInterval: 8000, enableHighAccuracy: false }
+          { distanceFilter: 30, interval: 30000, fastestInterval: 15000, enableHighAccuracy: false }
         );
       } catch (e) {}
     })();
@@ -172,8 +187,9 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       error,
       requestPermission,
       getCurrentPosition,
+      getLocationSnapshot,
     }),
-    [location, permissionStatus, isAcquiring, error, requestPermission, getCurrentPosition]
+    [location, permissionStatus, isAcquiring, error, requestPermission, getCurrentPosition, getLocationSnapshot]
   );
 
   return (
