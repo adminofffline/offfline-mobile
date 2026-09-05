@@ -60,6 +60,7 @@ import { useLocation } from '../../context/LocationContext';
 import { extractCleanQrId, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
 import { distributorApi } from '../../api/distributor';
 import { brandApi } from '../../api/brand';
+import { adminApi } from '../../api/admin';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
@@ -839,7 +840,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
   // ── Load Real Production Data for Distributor with 0ms Cache & SWR ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
     try {
-      const [distRes, publicRes, settRes, profileRes, brandRes] = await Promise.all([
+      const [distRes, publicRes, settRes, profileRes, brandRes, adminRes] = await Promise.all([
         distributorApi.getScans({ limit: 100 }, forceRefresh).catch(() => null),
         apiCache.fetchWithCache('public_scan_audit', () => api.get('/public/scan-audit'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
         distributorApi.getSettlements(undefined, forceRefresh)
@@ -847,6 +848,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           .catch(() => paymentsApi.getDistributorSettlements({}, forceRefresh).catch(() => null)),
         apiCache.fetchWithCache('distributor_auth_me', () => authApi.me(), { forceRefresh, ttlMs: 60000 }).catch(() => null),
         apiCache.fetchWithCache('distributor_brand_campaigns', () => brandApi.getCampaigns(), { forceRefresh, ttlMs: 15000 }).catch(() => null),
+        apiCache.fetchWithCache('distributor_admin_campaigns', () => adminApi.getCampaigns(), { forceRefresh, ttlMs: 15000 }).catch(() => null),
       ]);
 
       if (profileRes?.data?.user) {
@@ -865,6 +867,12 @@ export function DistributorDashboardScreen({ navigation }: any) {
         : brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data)
         ? (brandRes as any).data
         : [];
+      const adminCampaigns = adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data.campaigns)
+        ? (adminRes as any).data.campaigns
+        : adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data)
+        ? (adminRes as any).data
+        : [];
+      const allCampaignsList = [...brandCampaigns, ...adminCampaigns];
 
       const mappedScans: ScanRecord[] = [];
       const seenCanIds = new Set<string>();
@@ -997,10 +1005,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
         sIdx++;
       });
 
-      // 4. Synthesize dynamic settlements from brand campaign routes across multiple dates (Web parity)
+      // 4. Synthesize dynamic settlements from brand & admin campaign routes across multiple dates (Web parity)
       const campaignSettlements: SettlementRecord[] = [];
-      if (Array.isArray(brandCampaigns) && brandCampaigns.length > 0) {
-        brandCampaigns.forEach((camp: any, cIdx: number) => {
+      if (Array.isArray(allCampaignsList) && allCampaignsList.length > 0) {
+        allCampaignsList.forEach((camp: any, cIdx: number) => {
           const cId = String(camp.id || camp._id || `CMP_${cIdx}`);
           const cTitle = String(camp.title || camp.campaign_title || 'Offfline Partner Campaign');
           const brandName = String(camp.brand_name || camp.brand || `${cTitle} Partner`);
@@ -1054,128 +1062,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
           productionSettlements.push(rec);
         }
       });
-
-      if (productionSettlements.length === 0) {
-        const d0 = new Date();
-        const d1 = new Date();
-        d1.setDate(d0.getDate() - 1);
-        const d2 = new Date();
-        d2.setDate(d0.getDate() - 2);
-
-        const date0Str = d0.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const date1Str = d1.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const date2Str = d2.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-
-        productionSettlements.push(
-          // Date 0: 4 settlements summing to ₹42,800
-          {
-            id: 'SET_DIST_201',
-            campaignTitle: 'Metro Tech Park Dispatches',
-            brandName: 'Tata Consumer',
-            bottlesCount: 8500,
-            commission: 12750,
-            deliveryDate: date0Str,
-            deliveryTime: '10:15 AM',
-            locationTitle: 'Chennai Central Hub',
-            gpsCoords: '13.0827° N, 80.2707° E',
-            ipAddress: '192.168.1.201',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_DIST_202',
-            campaignTitle: 'High-Density Residential Route',
-            brandName: 'Bisleri International',
-            bottlesCount: 7200,
-            commission: 10800,
-            deliveryDate: date0Str,
-            deliveryTime: '01:45 PM',
-            locationTitle: 'T. Nagar Hub',
-            gpsCoords: '13.0418° N, 80.2341° E',
-            ipAddress: '192.168.1.202',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_DIST_203',
-            campaignTitle: 'Commercial Outlet Express Route',
-            brandName: 'Kinley Bottlers',
-            bottlesCount: 6500,
-            commission: 9750,
-            deliveryDate: date0Str,
-            deliveryTime: '04:30 PM',
-            locationTitle: 'Adyar Distribution Depot',
-            gpsCoords: '13.0012° N, 80.2565° E',
-            ipAddress: '192.168.1.203',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_DIST_204',
-            campaignTitle: 'Evening Hospitality Supply',
-            brandName: 'Aquafina Operations',
-            bottlesCount: 6333,
-            commission: 9500,
-            deliveryDate: date0Str,
-            deliveryTime: '07:00 PM',
-            locationTitle: 'Velachery Hub',
-            gpsCoords: '12.9815° N, 80.2180° E',
-            ipAddress: '192.168.1.204',
-            settlementStatus: 'SETTLED',
-          },
-          // Date 1: 2 settlements summing to ₹28,500
-          {
-            id: 'SET_DIST_205',
-            campaignTitle: 'Corporate Towers Route',
-            brandName: 'Himalayan Natural',
-            bottlesCount: 10000,
-            commission: 15000,
-            deliveryDate: date1Str,
-            deliveryTime: '11:30 AM',
-            locationTitle: 'Chennai Central Hub',
-            gpsCoords: '13.0827° N, 80.2707° E',
-            ipAddress: '192.168.1.205',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_DIST_206',
-            campaignTitle: 'Suburban Retail Chain Run',
-            brandName: 'Tata Consumer',
-            bottlesCount: 9000,
-            commission: 13500,
-            deliveryDate: date1Str,
-            deliveryTime: '03:15 PM',
-            locationTitle: 'T. Nagar Hub',
-            gpsCoords: '13.0418° N, 80.2341° E',
-            ipAddress: '192.168.1.206',
-            settlementStatus: 'SETTLED',
-          },
-          // Date 2: 2 settlements summing to ₹45,000
-          {
-            id: 'SET_DIST_207',
-            campaignTitle: 'Bulk Institutional Logistics Run',
-            brandName: 'Bisleri International',
-            bottlesCount: 16000,
-            commission: 24000,
-            deliveryDate: date2Str,
-            deliveryTime: '10:00 AM',
-            locationTitle: 'Adyar Distribution Depot',
-            gpsCoords: '13.0012° N, 80.2565° E',
-            ipAddress: '192.168.1.207',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_DIST_208',
-            campaignTitle: 'Weekend Distribution Drive',
-            brandName: 'Kinley Bottlers',
-            bottlesCount: 14000,
-            commission: 21000,
-            deliveryDate: date2Str,
-            deliveryTime: '02:45 PM',
-            locationTitle: 'Velachery Hub',
-            gpsCoords: '12.9815° N, 80.2180° E',
-            ipAddress: '192.168.1.208',
-            settlementStatus: 'SETTLED',
-          },
-        );
-      }
 
       setLedgerRecords(productionSettlements);
     } catch (e) {

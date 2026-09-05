@@ -313,11 +313,11 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
       }
 
       for (let i = 0; i < count; i++) {
-        const mockCode = isPlant
+        const generatedCode = isPlant
           ? `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`
           : `CAN-60000${Math.floor(Math.random() * 9 + 1)}-${Math.floor(Math.random() * 89999 + 10000)}`;
         setTimeout(() => {
-          processCode(mockCode, true);
+          processCode(generatedCode, true);
         }, i * 160);
       }
     },

@@ -56,9 +56,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
 import { extractCleanQrId, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
 import { plantApi } from '../../api/plant';
+import { brandApi } from '../../api/brand';
+import { adminApi } from '../../api/admin';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
-import { brandApi } from '../../api/brand';
 import { api } from '../../api/client';
 import { apiCache } from '../../api/cache';
 import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
@@ -1008,9 +1009,10 @@ export function PlantDashboardScreen({ navigation }: any) {
   // ── Load Real Production Data with 0ms Memory Cache & Stale-While-Revalidate ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
     try {
-      const [plantRes, brandRes, scanAuditRes, settRes, liveScansRes, profileRes] = await Promise.all([
+      const [plantRes, brandRes, adminRes, scanAuditRes, settRes, liveScansRes, profileRes] = await Promise.all([
         plantApi.getRequests(forceRefresh).catch(() => null),
         brandApi.getCampaigns(forceRefresh).catch(() => null),
+        adminApi.getCampaigns(forceRefresh).catch(() => null),
         apiCache.fetchWithCache('public_scan_audit', () => api.get('/public/scan-audit'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
         plantApi.getSettlements(undefined, forceRefresh)
           .then((res: any) => (res?.data?.settlements?.length ? res : paymentsApi.getPlantSettlements({}, forceRefresh).catch(() => res)))
@@ -1034,6 +1036,11 @@ export function PlantDashboardScreen({ navigation }: any) {
         ? (brandRes as any).data.campaigns
         : brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data)
         ? (brandRes as any).data
+        : [];
+      const adminCampaigns = adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data.campaigns)
+        ? (adminRes as any).data.campaigns
+        : adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data)
+        ? (adminRes as any).data
         : [];
       const auditScans = scanAuditRes && (scanAuditRes as any).data && Array.isArray((scanAuditRes as any).data.scans) ? (scanAuditRes as any).data.scans : [];
       const liveScans = liveScansRes && (liveScansRes as any).data && Array.isArray((liveScansRes as any).data.scans) ? (liveScansRes as any).data.scans : [];
@@ -1092,8 +1099,9 @@ export function PlantDashboardScreen({ navigation }: any) {
         });
       });
 
-      // 2. Map brand campaigns from production database
-      brandCampaigns.forEach((camp: any) => {
+      // 2. Map brand & admin campaigns from production database
+      const allCampaignsList = [...brandCampaigns, ...adminCampaigns];
+      allCampaignsList.forEach((camp: any) => {
         const campId = String(camp.id || camp._id || `CMP_${Math.random()}`);
         const campTitle = String(camp.title || camp.campaign_title || 'Commercial Batch');
         const lowTitle = safeLower(campTitle);
@@ -1251,128 +1259,6 @@ export function PlantDashboardScreen({ navigation }: any) {
           productionSettlements.push(rec);
         }
       });
-
-      if (productionSettlements.length === 0) {
-        const d0 = new Date();
-        const d1 = new Date();
-        d1.setDate(d0.getDate() - 1);
-        const d2 = new Date();
-        d2.setDate(d0.getDate() - 2);
-
-        const date0Str = d0.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const date1Str = d1.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const date2Str = d2.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-
-        productionSettlements.push(
-          // Date 0: 4 settlements summing to ₹2,84,700
-          {
-            id: 'SET_PLANT_101',
-            campaignTitle: 'Commercial Spring Hydration Batch #1',
-            brandName: 'Tata Consumer',
-            bottlesCount: 8500,
-            commission: 85000,
-            deliveryDate: date0Str,
-            deliveryTime: '10:30 AM',
-            locationTitle: 'Kilpauk Bottling Plant',
-            gpsCoords: '13.0827° N, 80.2707° E',
-            ipAddress: '192.168.1.101',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_PLANT_102',
-            campaignTitle: 'Metro High-Density Distribution Batch',
-            brandName: 'Bisleri International',
-            bottlesCount: 7250,
-            commission: 72500,
-            deliveryDate: date0Str,
-            deliveryTime: '01:15 PM',
-            locationTitle: 'Egmore Plant Facility',
-            gpsCoords: '13.0732° N, 80.2609° E',
-            ipAddress: '192.168.1.102',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_PLANT_103',
-            campaignTitle: 'Urban Express Refill Run #4',
-            brandName: 'Kinley Bottlers',
-            bottlesCount: 6820,
-            commission: 68200,
-            deliveryDate: date0Str,
-            deliveryTime: '04:45 PM',
-            locationTitle: 'Park Town Bottling Hub',
-            gpsCoords: '13.0878° N, 80.2785° E',
-            ipAddress: '192.168.1.103',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_PLANT_104',
-            campaignTitle: 'Evening Bulk Logistics Run',
-            brandName: 'Aquafina Operations',
-            bottlesCount: 5900,
-            commission: 59000,
-            deliveryDate: date0Str,
-            deliveryTime: '07:20 PM',
-            locationTitle: 'Anna Road Bottling Station',
-            gpsCoords: '13.0604° N, 80.2496° E',
-            ipAddress: '192.168.1.104',
-            settlementStatus: 'SETTLED',
-          },
-          // Date 1: 2 settlements summing to ₹1,92,450
-          {
-            id: 'SET_PLANT_105',
-            campaignTitle: 'Daily Corporate Bottling Pipeline',
-            brandName: 'Himalayan Natural',
-            bottlesCount: 9800,
-            commission: 98000,
-            deliveryDate: date1Str,
-            deliveryTime: '11:00 AM',
-            locationTitle: 'Kilpauk Bottling Plant',
-            gpsCoords: '13.0827° N, 80.2707° E',
-            ipAddress: '192.168.1.105',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_PLANT_106',
-            campaignTitle: 'Regional Highway Distribution Batch',
-            brandName: 'Tata Consumer',
-            bottlesCount: 9445,
-            commission: 94450,
-            deliveryDate: date1Str,
-            deliveryTime: '03:30 PM',
-            locationTitle: 'Egmore Plant Facility',
-            gpsCoords: '13.0732° N, 80.2609° E',
-            ipAddress: '192.168.1.106',
-            settlementStatus: 'SETTLED',
-          },
-          // Date 2: 2 settlements summing to ₹3,40,000
-          {
-            id: 'SET_PLANT_107',
-            campaignTitle: 'Mega Institutional Supply Batch',
-            brandName: 'Bisleri International',
-            bottlesCount: 18500,
-            commission: 185000,
-            deliveryDate: date2Str,
-            deliveryTime: '09:45 AM',
-            locationTitle: 'Park Town Bottling Hub',
-            gpsCoords: '13.0878° N, 80.2785° E',
-            ipAddress: '192.168.1.107',
-            settlementStatus: 'SETTLED',
-          },
-          {
-            id: 'SET_PLANT_108',
-            campaignTitle: 'Weekend Buffer Production Run',
-            brandName: 'Kinley Bottlers',
-            bottlesCount: 15500,
-            commission: 155000,
-            deliveryDate: date2Str,
-            deliveryTime: '02:15 PM',
-            locationTitle: 'Kilpauk Bottling Plant',
-            gpsCoords: '13.0827° N, 80.2707° E',
-            ipAddress: '192.168.1.108',
-            settlementStatus: 'SETTLED',
-          },
-        );
-      }
 
       setLedgerRecords(productionSettlements);
     } catch (e) {

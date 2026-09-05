@@ -50,7 +50,7 @@ export function PlantRegisterScreen({ navigation }: any) {
     }
   };
 
-  const handleMockUpload = () => {
+  const handleUploadArtwork = () => {
     try {
       ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
     } catch (e) {}
@@ -152,7 +152,7 @@ export function PlantRegisterScreen({ navigation }: any) {
           
           <TouchableOpacity 
             style={[styles.uploadBox, fileUploaded && styles.uploadBoxSuccess]} 
-            onPress={handleMockUpload}
+            onPress={handleUploadArtwork}
             disabled={isUploading || fileUploaded}
           >
             {isUploading ? (
