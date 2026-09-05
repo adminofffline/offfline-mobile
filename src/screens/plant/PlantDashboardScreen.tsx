@@ -947,16 +947,16 @@ export function PlantDashboardScreen({ navigation }: any) {
   }
   const currentDetailOrder = selectedDetailOrder || activeDetailOrderRef.current;
   const [plantProfileName, setPlantProfileName] = useState(
-    currentUser?.fullName || (currentUser as any)?.plantName || 'Water Bottling Facility'
+    currentUser?.fullName || (currentUser as any)?.plantName || ''
   );
   const [plantIsiNumber, setPlantIsiNumber] = useState(
     currentUser?.isiNumber || currentUser?.isi_registration_number || ''
   );
   const [plantAddress, setPlantAddress] = useState(
-    currentUser?.address || 'Chennai Facility'
+    currentUser?.address || ''
   );
   const [plantCapacity, setPlantCapacity] = useState(
-    currentUser?.dailyCapacity || '50,000 cans/day'
+    currentUser?.dailyCapacity || ''
   );
 
   // Password Form States
@@ -2083,7 +2083,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                         style={styles.modalTextInput}
                         value={plantCapacity}
                         onChangeText={setPlantCapacity}
-                        placeholder="50,000 cans/day"
+                        placeholder="e.g. 50,000 cans/day"
                         placeholderTextColor="#94A3B8"
                       />
                     </View>
@@ -2099,7 +2099,7 @@ export function PlantDashboardScreen({ navigation }: any) {
                       style={styles.modalTextInput}
                       value={plantAddress}
                       onChangeText={setPlantAddress}
-                      placeholder="Chennai Facility"
+                      placeholder="e.g. Facility Address, City"
                       placeholderTextColor="#94A3B8"
                     />
                   </View>

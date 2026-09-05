@@ -785,7 +785,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // Profile Form States
   const [profileOrgName, setProfileOrgName] = useState(
-    currentUser?.companyName || currentUser?.fullName || 'Distributor Facility'
+    currentUser?.companyName || currentUser?.fullName || ''
   );
   const [profileEmail, setProfileEmail] = useState(currentUser?.email || '');
   const [profilePhone, setProfilePhone] = useState(currentUser?.phone || '');
@@ -794,8 +794,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
   const [profileBankName, setProfileBankName] = useState(currentUser?.distributor_profile?.bank_name || '');
   const [profileAccountNo, setProfileAccountNo] = useState(currentUser?.distributor_profile?.account_no || '');
   const [profileIfsc, setProfileIfsc] = useState(currentUser?.distributor_profile?.ifsc_code || '');
-  const [profileDeliveryCapacity, setProfileDeliveryCapacity] = useState(currentUser?.distributor_profile?.delivery_capacity || '15,000 cans/day');
-  const [profileAddress, setProfileAddress] = useState(currentUser?.distributor_profile?.warehouse_address || currentUser?.address || 'Chennai Facility');
+  const [profileDeliveryCapacity, setProfileDeliveryCapacity] = useState(currentUser?.distributor_profile?.delivery_capacity || '');
+  const [profileAddress, setProfileAddress] = useState(currentUser?.distributor_profile?.warehouse_address || currentUser?.address || '');
 
   // Password Form States
   const [oldPassword, setOldPassword] = useState('');

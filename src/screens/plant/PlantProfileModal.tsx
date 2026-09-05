@@ -34,16 +34,18 @@ export const PlantProfileModal: React.FC<PlantProfileModalProps> = ({ visible, o
   const { user, updateProfile } = useAuth();
 
   const [plantName, setPlantName] = useState(
-    user?.plantName || user?.companyName || user?.fullName || 'Water Plant Facility'
+    user?.plantName || user?.companyName || user?.fullName || ''
   );
   const [isiNumber, setIsiNumber] = useState(
     user?.isiNumber || user?.isi_registration_number || user?.plant_profile?.isi_licence_number || ''
   );
   const [dailyCapacity, setDailyCapacity] = useState(
-    user?.dailyCapacity || (user?.plant_profile?.max_capacity ? `${user.plant_profile.max_capacity} Units/day` : '50,000 Units/day')
+    user?.dailyCapacity || (user?.plant_profile?.max_capacity ? `${user.plant_profile.max_capacity} Units/day` : '')
   );
-  const [distributorCapacity, setDistributorCapacity] = useState('10,000 cans');
-  const [address, setAddress] = useState(user?.address || user?.plant_profile?.address || 'Chennai Facility');
+  const [distributorCapacity, setDistributorCapacity] = useState(
+    (user as any)?.distributorCapacity || ''
+  );
+  const [address, setAddress] = useState(user?.address || user?.plant_profile?.address || '');
   const [hasInhousePrinter, setHasInhousePrinter] = useState(Boolean(user?.plant_profile?.has_inhouse_printer));
 
   const [isSaving, setIsSaving] = useState(false);

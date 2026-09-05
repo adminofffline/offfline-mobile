@@ -34,20 +34,20 @@ export const DistributorProfileModal: React.FC<DistributorProfileModalProps> = (
   const { user, updateProfile } = useAuth();
 
   const [companyName, setCompanyName] = useState(
-    user?.companyName || (user as any)?.organization || user?.fullName || 'Beverage Distribution Hub'
+    user?.companyName || (user as any)?.organization || user?.fullName || ''
   );
-  const [ownerName, setOwnerName] = useState(user?.fullName || 'Distributor Operations');
+  const [ownerName, setOwnerName] = useState(user?.fullName || '');
   const [warehouseAddress, setWarehouseAddress] = useState(
-    user?.address || user?.distributor_profile?.warehouse_address || 'Central Distribution Warehouse, Chennai'
+    user?.address || user?.distributor_profile?.warehouse_address || ''
   );
   const [deliveryCapacity, setDeliveryCapacity] = useState(
-    user?.distributor_profile?.delivery_capacity ? `${user.distributor_profile.delivery_capacity} cans/day` : '20,000 cans/day'
+    user?.distributor_profile?.delivery_capacity ? `${user.distributor_profile.delivery_capacity} cans/day` : ''
   );
   const [bankAccount, setBankAccount] = useState(
-    user?.distributor_profile?.account_no || '987654321098'
+    user?.distributor_profile?.account_no || ''
   );
   const [ifscCode, setIfscCode] = useState(
-    user?.distributor_profile?.ifsc_code || 'HDFC0001234'
+    user?.distributor_profile?.ifsc_code || ''
   );
 
   const [isSaving, setIsSaving] = useState(false);
