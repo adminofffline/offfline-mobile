@@ -1028,47 +1028,60 @@ export function DistributorDashboardScreen({ navigation }: any) {
       </Modal>
 
       {/* ── MODAL 3: USER MENU ── */}
-      <Modal visible={showUserMenu} animationType="fade" transparent>
+      <Modal
+        visible={showUserMenu}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowUserMenu(false)}
+      >
         <TouchableOpacity
           style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setShowUserMenu(false)}
         >
-          <View style={styles.userMenuCard}>
-            <View style={styles.userMenuEmailBox}>
-              <Text style={styles.userMenuName}>{profileOrgName}</Text>
-              <Text style={styles.userMenuEmail}>{profileEmail}</Text>
+          <SafeAreaView style={styles.menuSafeArea} pointerEvents="box-none">
+            <View style={styles.userMenuCard}>
+              <View style={styles.userMenuEmailBox}>
+                <Text style={styles.userMenuName}>{profileOrgName}</Text>
+                <Text style={styles.userMenuEmail}>{profileEmail}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.userMenuItem}
+                onPress={() => {
+                  setShowUserMenu(false);
+                  setShowProfileModal(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <User color="#4F46E5" size={17} />
+                <Text style={styles.userMenuItemText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.userMenuItem}
+                onPress={() => {
+                  setShowUserMenu(false);
+                  setShowChangePasswordModal(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <KeyRound color="#4F46E5" size={17} />
+                <Text style={styles.userMenuItemText}>Change Password</Text>
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+
+              <TouchableOpacity
+                style={styles.userMenuItem}
+                onPress={signOut}
+                activeOpacity={0.7}
+              >
+                <LogOut color="#EF4444" size={17} />
+                <Text style={[styles.userMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.userMenuItem}
-              onPress={() => {
-                setShowUserMenu(false);
-                setShowProfileModal(true);
-              }}
-            >
-              <User color="#4F46E5" size={18} />
-              <Text style={styles.userMenuItemText}>Edit Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.userMenuItem}
-              onPress={() => {
-                setShowUserMenu(false);
-                setShowChangePasswordModal(true);
-              }}
-            >
-              <KeyRound color="#4F46E5" size={18} />
-              <Text style={styles.userMenuItemText}>Change Password</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity style={styles.userMenuItem} onPress={signOut}>
-              <LogOut color="#EF4444" size={18} />
-              <Text style={[styles.userMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
+          </SafeAreaView>
         </TouchableOpacity>
       </Modal>
 
@@ -1897,42 +1910,46 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // User Menu Dropdown
+  // User Menu Dropdown (Anchored Below Profile Avatar)
   menuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  menuSafeArea: {
+    flex: 1,
     alignItems: 'flex-end',
     justifyContent: 'flex-start',
-    paddingTop: 56,
+    paddingTop: Platform.OS === 'ios' ? 56 : 52,
     paddingRight: 16,
   },
   userMenuCard: {
-    width: 220,
+    width: 235,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F1F5F9',
   },
   userMenuEmailBox: {
     padding: 10,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     marginBottom: 6,
   },
   userMenuName: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.1,
   },
   userMenuEmail: {
     fontSize: 11,
-    color: '#6B7280',
+    color: '#64748B',
     marginTop: 2,
   },
   userMenuItem: {
@@ -1941,16 +1958,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   userMenuItemText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: '#334155',
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F1F5F9',
     marginVertical: 4,
   },
   errorText: {
