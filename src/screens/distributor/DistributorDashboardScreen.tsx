@@ -2611,7 +2611,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 220 : 190,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 85,
   },
   titleRow: {
     marginBottom: 10,
@@ -4193,8 +4193,9 @@ const styles = StyleSheet.create({
   paginationContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
+    gap: 4,
   },
   loadMoreBtn: {
     flexDirection: 'row',
