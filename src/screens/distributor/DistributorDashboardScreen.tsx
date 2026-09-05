@@ -488,7 +488,7 @@ const DistributorSettlementCardItem = React.memo(({
 }: {
   record: SettlementRecord;
   isExpanded: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
   onViewModal: (record: SettlementRecord) => void;
 }) => {
   const isSettled = record.settlementStatus === 'SETTLED';
@@ -499,7 +499,7 @@ const DistributorSettlementCardItem = React.memo(({
     <View style={[styles.settlementCardContainer, isExpanded && styles.settlementCardContainerExpanded]}>
       <NativePressable
         style={styles.settlementCard}
-        onPress={onToggle}
+        onPress={() => onToggle(record.id)}
         hapticType="selection"
         scaleActive={0.99}
       >
@@ -610,8 +610,17 @@ export function DistributorDashboardScreen({ navigation }: any) {
     setActiveTab(tabKey as any);
   }, []);
 
-  // Search & Filter
+  // Search & Filter with Debounce
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 150);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -663,7 +672,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
   // Scanner Simulator Count
   const [scannerCount, setScannerCount] = useState(0);
 
-  const triggerToast = (
+  const triggerToast = useCallback((
     msg: string | ToastData,
     subtitle?: string,
     options?: { highlight?: string; isCelebration?: boolean }
@@ -678,7 +687,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
     } else {
       setToastData(msg);
     }
-  };
+  }, []);
+
+  const handleToggleSettlement = useCallback((id: string) => {
+    setExpandedSettlementId((prev) => (prev === id ? null : id));
+  }, []);
 
   // ── Load Real Production Data for Distributor with 0ms Cache & SWR ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
@@ -987,20 +1000,20 @@ export function DistributorDashboardScreen({ navigation }: any) {
     return scans.filter((s) => {
       if (activeFilter === 'COMPLETED' && s.status !== 'VERIFIED') return false;
       if (activeFilter === 'PENDING' && s.status === 'VERIFIED') return false;
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
+      if (!debouncedSearchQuery.trim()) return true;
+      const q = debouncedSearchQuery.toLowerCase().trim();
       return (
         s.can_id.toLowerCase().includes(q) ||
         s.campaign_title.toLowerCase().includes(q) ||
         s.location_name.toLowerCase().includes(q)
       );
     });
-  }, [scans, searchQuery, activeFilter]);
+  }, [scans, debouncedSearchQuery, activeFilter]);
 
   // Reset pagination on filter or search change
   useEffect(() => {
     setScansLimit(PAGE_SIZE);
-  }, [searchQuery, activeFilter]);
+  }, [debouncedSearchQuery, activeFilter]);
 
   // Lazy Loaded / Paginated Slices
   const displayedScans = useMemo(() => {
@@ -1160,7 +1173,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
             />
             {searchQuery.length > 0 && (
               <NativePressable
-                onPress={() => setSearchQuery('')}
+                onPress={() => {
+                  setSearchQuery('');
+                  setDebouncedSearchQuery('');
+                }}
                 style={styles.clearSearchBtn}
                 hapticType="selection"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1305,8 +1321,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
                       key={record.id}
                       record={record}
                       isExpanded={expandedSettlementId === record.id}
-                      onToggle={() => setExpandedSettlementId((prev) => (prev === record.id ? null : record.id))}
-                      onViewModal={(rec) => setSelectedSettlementModal(rec)}
+                      onToggle={handleToggleSettlement}
+                      onViewModal={setSelectedSettlementModal}
                     />
                   ))}
 
@@ -1391,7 +1407,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
         transparent
         onRequestClose={() => setShowProfileModal(false)}
       >
-        <View style={styles.centerModalOverlay}>
+        {showProfileModal && (
+          <View style={styles.centerModalOverlay}>
           <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
             <View style={StyleSheet.absoluteFillObject} />
           </TouchableWithoutFeedback>
@@ -1571,9 +1588,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
                 <ShieldCheck color="#FFFFFF" size={17} strokeWidth={2.2} />
                 <Text style={styles.saveProfileBtnText}>Save Profile Details</Text>
               </NativePressable>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </Modal>
 
       {/* ── 3. USER MENU (Anchored Directly Below Top Bar) ── */}
@@ -1639,7 +1657,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
         transparent
         onRequestClose={() => setShowChangePasswordModal(false)}
       >
-        <View style={styles.centerModalOverlay}>
+        {showChangePasswordModal && (
+          <View style={styles.centerModalOverlay}>
           <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
             <View style={StyleSheet.absoluteFillObject} />
           </TouchableWithoutFeedback>
@@ -1712,6 +1731,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
             </NativePressable>
           </View>
         </View>
+        )}
       </Modal>
 
       {/* ── MODAL 5: SCAN DELIVERY DETAILS (Apple Popped Bottom Sheet) ── */}

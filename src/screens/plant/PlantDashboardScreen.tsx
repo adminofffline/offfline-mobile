@@ -469,6 +469,39 @@ const CHENNAI_ZONES = [
   'Velachery (600042)',
 ];
 
+const ZonePickerItem = React.memo(({
+  zone,
+  isSelected,
+  onSelect,
+}: {
+  zone: string;
+  isSelected: boolean;
+  onSelect: (zone: string) => void;
+}) => {
+  return (
+    <NativePressable
+      style={[styles.zoneItem, isSelected && styles.zoneItemActive]}
+      onPress={() => onSelect(zone)}
+      hapticType="selection"
+      scaleActive={0.98}
+    >
+      <View style={styles.zoneItemLeft}>
+        <View style={[styles.zoneIconMini, isSelected && styles.zoneIconMiniActive]}>
+          <MapPin color={isSelected ? '#0284C7' : '#94A3B8'} size={14} />
+        </View>
+        <Text style={[styles.zoneItemText, isSelected && styles.zoneItemTextActive]}>
+          {zone}
+        </Text>
+      </View>
+      {isSelected ? (
+        <View style={styles.zoneSelectedBadge}>
+          <Check color="#FFFFFF" size={13} strokeWidth={2.8} />
+        </View>
+      ) : null}
+    </NativePressable>
+  );
+});
+
 const PlantOrderCardItem = React.memo(({
   order,
   onSelect,
@@ -609,7 +642,7 @@ const PlantSettlementCardItem = React.memo(({
 }: {
   record: SettlementRecord;
   isExpanded: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
   onViewModal: (record: SettlementRecord) => void;
 }) => {
   const isSettled = record.settlementStatus === 'SETTLED';
@@ -620,7 +653,7 @@ const PlantSettlementCardItem = React.memo(({
     <View style={[styles.settlementCardContainer, isExpanded && styles.settlementCardContainerExpanded]}>
       <NativePressable
         style={styles.settlementCard}
-        onPress={onToggle}
+        onPress={() => onToggle(record.id)}
         hapticType="selection"
         scaleActive={0.99}
       >
@@ -735,8 +768,17 @@ export function PlantDashboardScreen({ navigation }: any) {
   const [currentLocationDisplay, setCurrentLocationDisplay] = useState('Chennai');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
-  // Search & Filter
+  // Search & Filter with Debounce
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 150);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
 
   // Data
@@ -793,7 +835,7 @@ export function PlantDashboardScreen({ navigation }: any) {
   const [scannerCount, setScannerCount] = useState(0);
   const [selectedScanCampaign, setSelectedScanCampaign] = useState<BottlingOrder | null>(null);
 
-  const triggerToast = (
+  const triggerToast = useCallback((
     msg: string | ToastData,
     subtitle?: string,
     options?: { highlight?: string; isCelebration?: boolean }
@@ -808,7 +850,17 @@ export function PlantDashboardScreen({ navigation }: any) {
     } else {
       setToastData(msg);
     }
-  };
+  }, []);
+
+  const handleToggleSettlement = useCallback((id: string) => {
+    setExpandedSettlementId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleSelectZone = useCallback((zone: string) => {
+    setCurrentLocationDisplay(zone);
+    setShowLocationPicker(false);
+    triggerToast(`Filtered for ${zone}`);
+  }, [triggerToast]);
 
   // ── Load Real Production Data with 0ms Memory Cache & Stale-While-Revalidate ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
@@ -997,7 +1049,7 @@ export function PlantDashboardScreen({ navigation }: any) {
   }, [loadProductionData]);
 
   // ── Live Interactive Rate Booster (+100, +500, +5k) — Instant 0ms Optimistic UI ──
-  const handleBoostScans = (orderId: string, boostVal: number) => {
+  const handleBoostScans = useCallback((orderId: string, boostVal: number) => {
     ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
 
     // 1. Instant 0ms Optimistic Update (Swiggy / Zomato instant feedback)
@@ -1025,7 +1077,7 @@ export function PlantDashboardScreen({ navigation }: any) {
 
     // 2. Background non-blocking network sync
     plantApi.bulkSimulateScans(orderId, boostVal).catch(() => {});
-  };
+  }, [triggerToast]);
 
   // ── Real Camera & Vision Code Burst Scanner Handlers (Web Parity) ──
   const handleRealQrScanned = useCallback(
@@ -1240,8 +1292,8 @@ export function PlantDashboardScreen({ navigation }: any) {
       }
 
       // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
+      if (debouncedSearchQuery.trim()) {
+        const q = debouncedSearchQuery.toLowerCase().trim();
         return (
           String(order.campaign || '').toLowerCase().includes(q) ||
           String(order.brand || '').toLowerCase().includes(q) ||
@@ -1250,12 +1302,12 @@ export function PlantDashboardScreen({ navigation }: any) {
       }
       return true;
     });
-  }, [orders, activeFilter, searchQuery, currentLocationDisplay]);
+  }, [orders, activeFilter, debouncedSearchQuery, currentLocationDisplay]);
 
   // Reset pagination on filter or location change
   useEffect(() => {
     setOrdersLimit(PAGE_SIZE);
-  }, [searchQuery, activeFilter, currentLocationDisplay]);
+  }, [debouncedSearchQuery, activeFilter, currentLocationDisplay]);
 
   // Lazy Loaded / Paginated Slices
   const displayedOrders = useMemo(() => {
@@ -1407,7 +1459,10 @@ export function PlantDashboardScreen({ navigation }: any) {
             />
             {searchQuery.length > 0 && (
               <NativePressable
-                onPress={() => setSearchQuery('')}
+                onPress={() => {
+                  setSearchQuery('');
+                  setDebouncedSearchQuery('');
+                }}
                 style={styles.clearSearchBtn}
                 hapticType="selection"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1528,8 +1583,8 @@ export function PlantDashboardScreen({ navigation }: any) {
                       key={record.id}
                       record={record}
                       isExpanded={expandedSettlementId === record.id}
-                      onToggle={() => setExpandedSettlementId((prev) => (prev === record.id ? null : record.id))}
-                      onViewModal={(rec) => setSelectedSettlementModal(rec)}
+                      onToggle={handleToggleSettlement}
+                      onViewModal={setSelectedSettlementModal}
                     />
                   ))}
 
@@ -1620,64 +1675,44 @@ export function PlantDashboardScreen({ navigation }: any) {
         transparent
         onRequestClose={() => setShowLocationPicker(false)}
       >
-        <View style={styles.centerModalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShowLocationPicker(false)}>
-            <View style={StyleSheet.absoluteFillObject} />
-          </TouchableWithoutFeedback>
-          <View style={styles.profileModalCard}>
-            <View style={styles.profileModalHeader}>
-              <View style={styles.profileModalHeaderLeft}>
-                <View style={styles.modalIconSquircle}>
-                  <MapPin color="#0284C7" size={20} strokeWidth={2.2} />
+        {showLocationPicker && (
+          <View style={styles.centerModalOverlay}>
+            <TouchableWithoutFeedback onPress={() => setShowLocationPicker(false)}>
+              <View style={StyleSheet.absoluteFillObject} />
+            </TouchableWithoutFeedback>
+            <View style={styles.profileModalCard}>
+              <View style={styles.profileModalHeader}>
+                <View style={styles.profileModalHeaderLeft}>
+                  <View style={styles.modalIconSquircle}>
+                    <MapPin color="#0284C7" size={20} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.modalHeaderTitleCol}>
+                    <Text style={styles.profileModalTitle}>Select Operational Zone</Text>
+                    <Text style={styles.profileModalSubtitle}>Filter production batches by region</Text>
+                  </View>
                 </View>
-                <View style={styles.modalHeaderTitleCol}>
-                  <Text style={styles.profileModalTitle}>Select Operational Zone</Text>
-                  <Text style={styles.profileModalSubtitle}>Filter production batches by region</Text>
-                </View>
+                <NativePressable
+                  onPress={() => setShowLocationPicker(false)}
+                  style={styles.modalCloseCircle}
+                  hapticType="selection"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X color="#64748B" size={16} strokeWidth={2.4} />
+                </NativePressable>
               </View>
-              <NativePressable
-                onPress={() => setShowLocationPicker(false)}
-                style={styles.modalCloseCircle}
-                hapticType="selection"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <X color="#64748B" size={16} strokeWidth={2.4} />
-              </NativePressable>
-            </View>
-            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
-              {CHENNAI_ZONES.map((zone) => {
-                const isSelected = currentLocationDisplay === zone;
-                return (
-                  <NativePressable
+              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                {CHENNAI_ZONES.map((zone) => (
+                  <ZonePickerItem
                     key={zone}
-                    style={[styles.zoneItem, isSelected && styles.zoneItemActive]}
-                    onPress={() => {
-                      setCurrentLocationDisplay(zone);
-                      setShowLocationPicker(false);
-                      triggerToast(`Filtered for ${zone}`);
-                    }}
-                    hapticType="selection"
-                    scaleActive={0.98}
-                  >
-                    <View style={styles.zoneItemLeft}>
-                      <View style={[styles.zoneIconMini, isSelected && styles.zoneIconMiniActive]}>
-                        <MapPin color={isSelected ? '#0284C7' : '#94A3B8'} size={14} />
-                      </View>
-                      <Text style={[styles.zoneItemText, isSelected && styles.zoneItemTextActive]}>
-                        {zone}
-                      </Text>
-                    </View>
-                    {isSelected ? (
-                      <View style={styles.zoneSelectedBadge}>
-                        <Check color="#FFFFFF" size={13} strokeWidth={2.8} />
-                      </View>
-                    ) : null}
-                  </NativePressable>
-                );
-              })}
-            </ScrollView>
+                    zone={zone}
+                    isSelected={currentLocationDisplay === zone}
+                    onSelect={handleSelectZone}
+                  />
+                ))}
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        )}
       </Modal>
 
       {/* ── MODAL 3: EDIT PLANT FACILITY PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
@@ -1687,108 +1722,110 @@ export function PlantDashboardScreen({ navigation }: any) {
         transparent
         onRequestClose={() => setShowProfileModal(false)}
       >
-        <View style={styles.centerModalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
-            <View style={StyleSheet.absoluteFillObject} />
-          </TouchableWithoutFeedback>
-          <View style={styles.profileModalCard}>
-            {/* Modal Header with Apple Icon Squircle & Typography Stack */}
-            <View style={styles.profileModalHeader}>
-              <View style={styles.profileModalHeaderLeft}>
-                <View style={styles.modalIconSquircle}>
-                  <Factory color="#0284C7" size={19} strokeWidth={2.2} />
-                </View>
-                <View style={styles.modalHeaderTitleCol}>
-                  <Text style={styles.profileModalTitle}>Edit Plant Facility Profile</Text>
-                  <Text style={styles.profileModalSubtitle}>Licensing specs & output capacity</Text>
-                </View>
-              </View>
-              <NativePressable
-                onPress={() => setShowProfileModal(false)}
-                style={styles.modalCloseCircle}
-                hapticType="selection"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <X color="#64748B" size={16} strokeWidth={2.4} />
-              </NativePressable>
-            </View>
-
-            {/* Non-Scrollable Optimized Grid Form */}
-            <View style={styles.profileFormContainer}>
-              {/* Row 1 (Full Width): Plant / Company Name */}
-              <View style={styles.formFieldGroup}>
-                <Text style={styles.inputLabel}>PLANT / COMPANY NAME</Text>
-                <View style={styles.inputFieldContainer}>
-                  <Building2 size={14} color="#0284C7" strokeWidth={2} />
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={plantProfileName}
-                    onChangeText={setPlantProfileName}
-                    placeholder="Enter plant name"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              {/* Row 2 (2 Columns): ISI Licence & Daily Bottling Capacity */}
-              <View style={styles.formRow2Col}>
-                <View style={styles.formCol}>
-                  <Text style={styles.inputLabel}>ISI LICENCE (CM/L NUMBER)</Text>
-                  <View style={styles.inputFieldContainer}>
-                    <ShieldCheck size={14} color="#0284C7" strokeWidth={2} />
-                    <TextInput
-                      style={[styles.modalTextInput, styles.monoInputText]}
-                      value={plantIsiNumber}
-                      onChangeText={setPlantIsiNumber}
-                      placeholder="CM/L-XXXXXXXXXX"
-                      placeholderTextColor="#94A3B8"
-                      autoCapitalize="characters"
-                    />
+        {showProfileModal && (
+          <View style={styles.centerModalOverlay}>
+            <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
+              <View style={StyleSheet.absoluteFillObject} />
+            </TouchableWithoutFeedback>
+            <View style={styles.profileModalCard}>
+              {/* Modal Header with Apple Icon Squircle & Typography Stack */}
+              <View style={styles.profileModalHeader}>
+                <View style={styles.profileModalHeaderLeft}>
+                  <View style={styles.modalIconSquircle}>
+                    <Factory color="#0284C7" size={19} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.modalHeaderTitleCol}>
+                    <Text style={styles.profileModalTitle}>Edit Plant Facility Profile</Text>
+                    <Text style={styles.profileModalSubtitle}>Licensing specs & output capacity</Text>
                   </View>
                 </View>
-                <View style={styles.formCol}>
-                  <Text style={styles.inputLabel}>DAILY BOTTLING CAPACITY</Text>
+                <NativePressable
+                  onPress={() => setShowProfileModal(false)}
+                  style={styles.modalCloseCircle}
+                  hapticType="selection"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X color="#64748B" size={16} strokeWidth={2.4} />
+                </NativePressable>
+              </View>
+
+              {/* Non-Scrollable Optimized Grid Form */}
+              <View style={styles.profileFormContainer}>
+                {/* Row 1 (Full Width): Plant / Company Name */}
+                <View style={styles.formFieldGroup}>
+                  <Text style={styles.inputLabel}>PLANT / COMPANY NAME</Text>
                   <View style={styles.inputFieldContainer}>
-                    <Gauge size={14} color="#0284C7" strokeWidth={2} />
+                    <Building2 size={14} color="#0284C7" strokeWidth={2} />
                     <TextInput
                       style={styles.modalTextInput}
-                      value={plantCapacity}
-                      onChangeText={setPlantCapacity}
-                      placeholder="50,000 cans/day"
+                      value={plantProfileName}
+                      onChangeText={setPlantProfileName}
+                      placeholder="Enter plant name"
                       placeholderTextColor="#94A3B8"
                     />
                   </View>
                 </View>
-              </View>
 
-              {/* Row 3 (Full Width): Plant Location / Address */}
-              <View style={styles.formFieldGroup}>
-                <Text style={styles.inputLabel}>PLANT LOCATION / ADDRESS</Text>
-                <View style={styles.inputFieldContainer}>
-                  <MapPin size={14} color="#0284C7" strokeWidth={2} />
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={plantAddress}
-                    onChangeText={setPlantAddress}
-                    placeholder="Chennai Facility"
-                    placeholderTextColor="#94A3B8"
-                  />
+                {/* Row 2 (2 Columns): ISI Licence & Daily Bottling Capacity */}
+                <View style={styles.formRow2Col}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>ISI LICENCE (CM/L NUMBER)</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <ShieldCheck size={14} color="#0284C7" strokeWidth={2} />
+                      <TextInput
+                        style={[styles.modalTextInput, styles.monoInputText]}
+                        value={plantIsiNumber}
+                        onChangeText={setPlantIsiNumber}
+                        placeholder="CM/L-XXXXXXXXXX"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>DAILY BOTTLING CAPACITY</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <Gauge size={14} color="#0284C7" strokeWidth={2} />
+                      <TextInput
+                        style={styles.modalTextInput}
+                        value={plantCapacity}
+                        onChangeText={setPlantCapacity}
+                        placeholder="50,000 cans/day"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                  </View>
                 </View>
-              </View>
 
-              {/* Primary Action CTA */}
-              <NativePressable
-                style={styles.saveProfileBtn}
-                onPress={handleSaveProfile}
-                hapticType="impactMedium"
-                scaleActive={0.97}
-              >
-                <ShieldCheck color="#FFFFFF" size={17} strokeWidth={2.2} />
-                <Text style={styles.saveProfileBtnText}>Save Profile Changes</Text>
-              </NativePressable>
+                {/* Row 3 (Full Width): Plant Location / Address */}
+                <View style={styles.formFieldGroup}>
+                  <Text style={styles.inputLabel}>PLANT LOCATION / ADDRESS</Text>
+                  <View style={styles.inputFieldContainer}>
+                    <MapPin size={14} color="#0284C7" strokeWidth={2} />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={plantAddress}
+                      onChangeText={setPlantAddress}
+                      placeholder="Chennai Facility"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+
+                {/* Primary Action CTA */}
+                <NativePressable
+                  style={styles.saveProfileBtn}
+                  onPress={handleSaveProfile}
+                  hapticType="impactMedium"
+                  scaleActive={0.97}
+                >
+                  <ShieldCheck color="#FFFFFF" size={17} strokeWidth={2.2} />
+                  <Text style={styles.saveProfileBtnText}>Save Profile Changes</Text>
+                </NativePressable>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </Modal>
 
       {/* ── 4. USER ACCOUNT MENU (Anchored Directly Below Top Bar) ── */}
@@ -1854,79 +1891,81 @@ export function PlantDashboardScreen({ navigation }: any) {
         transparent
         onRequestClose={() => setShowChangePasswordModal(false)}
       >
-        <View style={styles.centerModalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
-            <View style={StyleSheet.absoluteFillObject} />
-          </TouchableWithoutFeedback>
-          <View style={styles.profileModalCard}>
-            <View style={styles.profileModalHeader}>
-              <View style={styles.profileModalHeaderLeft}>
-                <View style={styles.modalIconSquircle}>
-                  <KeyRound color="#0284C7" size={20} strokeWidth={2.2} />
+        {showChangePasswordModal && (
+          <View style={styles.centerModalOverlay}>
+            <TouchableWithoutFeedback onPress={() => setShowChangePasswordModal(false)}>
+              <View style={StyleSheet.absoluteFillObject} />
+            </TouchableWithoutFeedback>
+            <View style={styles.profileModalCard}>
+              <View style={styles.profileModalHeader}>
+                <View style={styles.profileModalHeaderLeft}>
+                  <View style={styles.modalIconSquircle}>
+                    <KeyRound color="#0284C7" size={20} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.modalHeaderTitleCol}>
+                    <Text style={styles.profileModalTitle}>Change Password</Text>
+                    <Text style={styles.profileModalSubtitle}>Secure your facility credentials</Text>
+                  </View>
                 </View>
-                <View style={styles.modalHeaderTitleCol}>
-                  <Text style={styles.profileModalTitle}>Change Password</Text>
-                  <Text style={styles.profileModalSubtitle}>Secure your facility credentials</Text>
+                <NativePressable
+                  onPress={() => setShowChangePasswordModal(false)}
+                  style={styles.modalCloseCircle}
+                  hapticType="selection"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X color="#64748B" size={16} strokeWidth={2.4} />
+                </NativePressable>
+              </View>
+
+              {passwordError ? (
+                <View style={styles.modalErrorBanner}>
+                  <AlertCircle size={14} color="#EF4444" />
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.formFieldGroup}>
+                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                <View style={styles.inputFieldContainer}>
+                  <Lock size={16} color="#0284C7" strokeWidth={2} />
+                  <TextInput
+                    style={styles.modalTextInput}
+                    secureTextEntry
+                    value={oldPassword}
+                    onChangeText={setOldPassword}
+                    placeholder="Enter current password"
+                    placeholderTextColor="#94A3B8"
+                  />
                 </View>
               </View>
+
+              <View style={styles.formFieldGroup}>
+                <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+                <View style={styles.inputFieldContainer}>
+                  <KeyRound size={16} color="#0284C7" strokeWidth={2} />
+                  <TextInput
+                    style={styles.modalTextInput}
+                    secureTextEntry
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="At least 6 characters"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
               <NativePressable
-                onPress={() => setShowChangePasswordModal(false)}
-                style={styles.modalCloseCircle}
-                hapticType="selection"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.saveProfileBtn}
+                onPress={handleChangePassword}
+                hapticType="impactMedium"
+                scaleActive={0.97}
               >
-                <X color="#64748B" size={16} strokeWidth={2.4} />
+                <KeyRound color="#FFFFFF" size={18} strokeWidth={2.2} />
+                <Text style={styles.saveProfileBtnText}>Update Password</Text>
               </NativePressable>
             </View>
-
-            {passwordError ? (
-              <View style={styles.modalErrorBanner}>
-                <AlertCircle size={14} color="#EF4444" />
-                <Text style={styles.errorText}>{passwordError}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.formFieldGroup}>
-              <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-              <View style={styles.inputFieldContainer}>
-                <Lock size={16} color="#0284C7" strokeWidth={2} />
-                <TextInput
-                  style={styles.modalTextInput}
-                  secureTextEntry
-                  value={oldPassword}
-                  onChangeText={setOldPassword}
-                  placeholder="Enter current password"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-            </View>
-
-            <View style={styles.formFieldGroup}>
-              <Text style={styles.inputLabel}>NEW PASSWORD</Text>
-              <View style={styles.inputFieldContainer}>
-                <KeyRound size={16} color="#0284C7" strokeWidth={2} />
-                <TextInput
-                  style={styles.modalTextInput}
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="At least 6 characters"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-            </View>
-
-            <NativePressable
-              style={styles.saveProfileBtn}
-              onPress={handleChangePassword}
-              hapticType="impactMedium"
-              scaleActive={0.97}
-            >
-              <KeyRound color="#FFFFFF" size={18} strokeWidth={2.2} />
-              <Text style={styles.saveProfileBtnText}>Update Password</Text>
-            </NativePressable>
           </View>
-        </View>
+        )}
       </Modal>
 
       {/* ── MODAL 5: ORDER DETAILS (Apple Popped Bottom Sheet) ── */}
