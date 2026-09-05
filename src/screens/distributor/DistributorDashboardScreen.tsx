@@ -57,8 +57,9 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps } from '../../utils/locationProfiles';
+import { extractCleanQrId, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
 import { distributorApi } from '../../api/distributor';
+import { brandApi } from '../../api/brand';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
@@ -838,13 +839,14 @@ export function DistributorDashboardScreen({ navigation }: any) {
   // ── Load Real Production Data for Distributor with 0ms Cache & SWR ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
     try {
-      const [distRes, publicRes, settRes, profileRes] = await Promise.all([
+      const [distRes, publicRes, settRes, profileRes, brandRes] = await Promise.all([
         distributorApi.getScans({ limit: 100 }, forceRefresh).catch(() => null),
         apiCache.fetchWithCache('public_scan_audit', () => api.get('/public/scan-audit'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
         distributorApi.getSettlements(undefined, forceRefresh)
           .then((res: any) => (res?.data?.settlements?.length ? res : paymentsApi.getDistributorSettlements({}, forceRefresh).catch(() => res)))
           .catch(() => paymentsApi.getDistributorSettlements({}, forceRefresh).catch(() => null)),
         apiCache.fetchWithCache('distributor_auth_me', () => authApi.me(), { forceRefresh, ttlMs: 60000 }).catch(() => null),
+        apiCache.fetchWithCache('distributor_brand_campaigns', () => brandApi.getCampaigns(), { forceRefresh, ttlMs: 15000 }).catch(() => null),
       ]);
 
       if (profileRes?.data?.user) {
@@ -858,6 +860,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
       const backendScans = distRes?.data?.scans || [];
       const auditScans = publicRes?.data?.scans || [];
+      const brandCampaigns = brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data.campaigns)
+        ? (brandRes as any).data.campaigns
+        : brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data)
+        ? (brandRes as any).data
+        : [];
 
       const mappedScans: ScanRecord[] = [];
       const seenCanIds = new Set<string>();
@@ -873,7 +880,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
             campaign_title: s.campaign_name || s.campaign_title || 'Offfline Campaign',
             location_name: s.location_name || 'Chennai Hub',
             deliveryTime: s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '11:30 AM',
-            payout_amount: Number(s.payout_amount || s.ratePerBottle || 10.00),
+            payout_amount: Number(s.payout_amount || s.ratePerBottle || 1.50),
             status: 'VERIFIED',
           });
         });
@@ -890,7 +897,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
               campaign_title: s.campaign_title || 'Offfline Partner Campaign',
               location_name: s.location_name || 'Chennai Zone',
               deliveryTime: s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '11:30 AM',
-              payout_amount: 10.00,
+              payout_amount: 1.50,
               status: 'VERIFIED',
             });
           }
@@ -899,9 +906,14 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
       setScans(mappedScans);
 
-      // 2. Map Real Settlements from Production (strictly isolate DISTRIBUTOR role at ₹10.00/can)
-      const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      const productionSettlements: SettlementRecord[] = [];
+      // 2. Map Real Settlements from Production (strictly isolate DISTRIBUTOR role)
+      const now = new Date();
+      const currentHour = now.getHours();
+      const isEodCutoffPassedToday = currentHour >= 22; // 10:00 PM EOD
+      const todayStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const todayDateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      
+      const serverSettlements: SettlementRecord[] = [];
 
       const rawSettlements = settRes?.data?.settlements || (Array.isArray(settRes?.data) ? settRes?.data : []);
       if (Array.isArray(rawSettlements) && rawSettlements.length > 0) {
@@ -923,62 +935,125 @@ export function DistributorDashboardScreen({ navigation }: any) {
           const resolvedGps = resolveLocationGps(locTitle);
           const gpsStr = s.gpsCoords || `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`;
 
-          // Distributor commission is ₹10.00 / can
-          const parsedCommission = parsedAmount >= bCount * 5.0 ? parsedAmount : bCount * 10.00;
+          // Distributor commission is ₹1.50 / can (or specified amount)
+          const parsedCommission = parsedAmount > 0 ? parsedAmount : bCount * 1.50;
 
-          productionSettlements.push({
+          const rawDate = s.settlementDate || s.deliveryDate || s.created_at || s.settledAt;
+          const d = rawDate ? new Date(rawDate) : null;
+          const formattedDate = d && !isNaN(d.getTime())
+            ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : String(rawDate || todayDateStr).replace(/^Today,\s*/i, '');
+
+          serverSettlements.push({
             id: String(s.id || s._id || `SET_${Math.random().toString().slice(-4)}`),
             campaignTitle: String(s.campaignTitle || s.campaign_title || s.campaign_name || 'Distributor Batch'),
             brandName: String(s.entityName || s.payeeName || s.brand_name || 'Logistics Partner'),
             bottlesCount: bCount,
             commission: parsedCommission,
-            deliveryDate: String(s.settlementDate || s.deliveryDate || (s.created_at || s.settledAt ? new Date(s.created_at || s.settledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : todayStr)).replace(/^Today,\s*/i, ''),
+            deliveryDate: formattedDate,
             deliveryTime: dTime,
             locationTitle: locTitle,
             gpsCoords: gpsStr,
-            ipAddress: String(s.ipAddress || '127.0.0.1 (Local Node)'),
+            ipAddress: String(s.ipAddress || resolveDistributorIp(locTitle)),
             settlementStatus: String(s.status || s.settlementStatus || '').toUpperCase().includes('PAID') || String(s.status || s.settlementStatus || '').toUpperCase().includes('SETTLED') ? 'SETTLED' : 'PENDING',
           });
         });
       }
 
-      // If backend has no settlements yet, dynamically synthesize settlements directly from the distributor's verified deliveries!
-      if (productionSettlements.length === 0 && mappedScans.length > 0) {
-        const d0 = new Date();
-        const date0Str = d0.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        
-        const scansByCamp = new Map<string, { count: number; title: string; loc: string; totalPayout: number }>();
-        mappedScans.forEach((sc) => {
-          const t = sc.campaign_title || 'Commercial Delivery Batch';
-          const ex = scansByCamp.get(t);
-          const pVal = sc.payout_amount || 10.00;
-          if (!ex) {
-            scansByCamp.set(t, { count: 1, title: t, loc: sc.location_name, totalPayout: pVal });
-          } else {
-            ex.count += 1;
-            ex.totalPayout += pVal;
-          }
-        });
+      // 3. Synthesize dynamic settlements from verified scans grouped by date + campaign
+      const scanSettlements: SettlementRecord[] = [];
+      const scansByDateAndCamp = new Map<string, { count: number; title: string; loc: string; dateStr: string; totalPayout: number }>();
+      mappedScans.forEach((sc) => {
+        const t = sc.campaign_title || 'Commercial Delivery Batch';
+        const dStr = todayDateStr;
+        const key = `${dStr}__${t}`;
+        const ex = scansByDateAndCamp.get(key);
+        const pVal = sc.payout_amount || 1.50;
+        if (!ex) {
+          scansByDateAndCamp.set(key, { count: 1, title: t, loc: sc.location_name, dateStr: dStr, totalPayout: pVal });
+        } else {
+          ex.count += 1;
+          ex.totalPayout += pVal;
+        }
+      });
 
-        let cIdx = 0;
-        scansByCamp.forEach((val) => {
-          const resolvedGps = resolveLocationGps(val.loc);
-          productionSettlements.push({
-            id: `SET_DIST_LIVE_${cIdx}`,
-            campaignTitle: val.title,
-            brandName: 'Logistics Partner',
-            bottlesCount: val.count,
-            commission: val.totalPayout > 0 ? val.totalPayout : val.count * 10.00,
-            deliveryDate: date0Str,
-            deliveryTime: '11:00 AM',
-            locationTitle: val.loc || 'Chennai Central Hub',
+      let sIdx = 0;
+      scansByDateAndCamp.forEach((val) => {
+        const resolvedGps = resolveLocationGps(val.loc);
+        const resolvedIp = resolveDistributorIp(val.loc);
+        scanSettlements.push({
+          id: `SET_DIST_SCAN_${sIdx}`,
+          campaignTitle: val.title,
+          brandName: 'Logistics Partner',
+          bottlesCount: val.count,
+          commission: val.totalPayout > 0 ? val.totalPayout : val.count * 1.50,
+          deliveryDate: val.dateStr,
+          deliveryTime: '11:00 AM',
+          locationTitle: val.loc || 'Chennai Central Hub',
+          gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
+          ipAddress: resolvedIp,
+          settlementStatus: 'SETTLED',
+        });
+        sIdx++;
+      });
+
+      // 4. Synthesize dynamic settlements from brand campaign routes across multiple dates (Web parity)
+      const campaignSettlements: SettlementRecord[] = [];
+      if (Array.isArray(brandCampaigns) && brandCampaigns.length > 0) {
+        brandCampaigns.forEach((camp: any, cIdx: number) => {
+          const cId = String(camp.id || camp._id || `CMP_${cIdx}`);
+          const cTitle = String(camp.title || camp.campaign_title || 'Offfline Partner Campaign');
+          const brandName = String(camp.brand_name || camp.brand || `${cTitle} Partner`);
+          const totalTarget = Number(camp.target_sticker_count || camp.totalNum || 5000);
+          const rawDate = camp.startDate || camp.start_date || camp.created_at || camp.delivery_date;
+          const resolvedLoc = camp.location_filter?.city || 
+            (Array.isArray(camp.location_filter?.sub_locations) ? camp.location_filter.sub_locations.join(', ') : null) || 
+            camp.target_location || 
+            'Chennai Central Hub';
+          
+          const d = rawDate ? new Date(rawDate) : null;
+          const orderDateStartOfDay = d && !isNaN(d.getTime()) ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() : todayStartOfDay;
+          const isPastDay = orderDateStartOfDay < todayStartOfDay;
+          const isToday = orderDateStartOfDay === todayStartOfDay;
+          const isSettled = isPastDay || (isToday && isEodCutoffPassedToday) || camp.status === 'COMPLETED';
+
+          const formattedDate = d && !isNaN(d.getTime())
+            ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : todayDateStr;
+
+          const resolvedGps = resolveLocationGps(resolvedLoc);
+          const resolvedIp = resolveDistributorIp(resolvedLoc);
+
+          campaignSettlements.push({
+            id: `SETTLE_DIST_${cId.replace(/[^a-zA-Z0-9]/g, '_').slice(-12)}_${cIdx}`,
+            campaignTitle: cTitle,
+            brandName: brandName,
+            bottlesCount: totalTarget,
+            commission: totalTarget * 1.50,
+            deliveryDate: formattedDate,
+            deliveryTime: '10:00 PM EOD',
+            locationTitle: resolvedLoc,
             gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-            ipAddress: `192.168.1.${200 + cIdx}`,
-            settlementStatus: 'SETTLED',
+            ipAddress: resolvedIp,
+            settlementStatus: isSettled ? 'SETTLED' : 'PENDING',
           });
-          cIdx++;
         });
       }
+
+      // Merge server records + scan records + campaign route records (deduplicated by campaign title or ID)
+      const combined = [...serverSettlements, ...scanSettlements, ...campaignSettlements];
+      const seenSettlementCampaigns = new Set<string>();
+      const productionSettlements: SettlementRecord[] = [];
+
+      combined.forEach((rec) => {
+        const normKey = (rec.campaignTitle || '').trim().toLowerCase();
+        if (normKey && !seenSettlementCampaigns.has(normKey)) {
+          seenSettlementCampaigns.add(normKey);
+          productionSettlements.push(rec);
+        } else if (!normKey) {
+          productionSettlements.push(rec);
+        }
+      });
 
       if (productionSettlements.length === 0) {
         const d0 = new Date();

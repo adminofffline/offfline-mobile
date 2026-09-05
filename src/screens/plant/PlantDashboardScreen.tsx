@@ -54,7 +54,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps } from '../../utils/locationProfiles';
+import { extractCleanQrId, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
 import { plantApi } from '../../api/plant';
 import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
@@ -455,6 +455,7 @@ interface BottlingOrder {
   revenue: number;
   plant_id?: string;
   original_id?: string;
+  startDate?: string;
 }
 
 interface SettlementRecord {
@@ -1065,6 +1066,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         const reqId = String(req.id || req._id || req.campaign_id || `REQ_${Math.random()}`);
         const reqTitle = String(req.campaign_name || req.campaignName || req.title || 'Water Bottling Batch');
         const lowTitle = safeLower(reqTitle);
+        const rawDate = req.startDate || req.start_date || req.delivery_date || req.created_at || req.updated_at;
         
         const matchingScanCount = Math.max(
           scanCountsByCampId.get(reqId) || 0,
@@ -1086,6 +1088,7 @@ export function PlantDashboardScreen({ navigation }: any) {
           status: isDone ? 'COMPLETED' : completedCount > 0 ? 'BOTTLING' : 'PENDING',
           revenue: totalTarget * 10.00,
           plant_id: req.plant_id ? String(req.plant_id) : undefined,
+          startDate: rawDate ? String(rawDate) : undefined,
         });
       });
 
@@ -1094,6 +1097,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         const campId = String(camp.id || camp._id || `CMP_${Math.random()}`);
         const campTitle = String(camp.title || camp.campaign_title || 'Commercial Batch');
         const lowTitle = safeLower(campTitle);
+        const rawDate = camp.startDate || camp.start_date || camp.created_at || camp.delivery_date || camp.updated_at;
 
         if (!seenIds.has(campId) && !seenTitles.has(lowTitle)) {
           const totalTarget = Number(camp.target_sticker_count || camp.totalNum || 5000);
@@ -1122,6 +1126,7 @@ export function PlantDashboardScreen({ navigation }: any) {
             status: isDone ? 'COMPLETED' : completedCount > 0 ? 'BOTTLING' : 'PENDING',
             revenue: totalTarget * 10.00,
             plant_id: camp.plant_id ? String(camp.plant_id) : undefined,
+            startDate: rawDate ? String(rawDate) : undefined,
           });
         }
       });
@@ -1147,8 +1152,13 @@ export function PlantDashboardScreen({ navigation }: any) {
       setBottlingCommissionTotal(commission);
 
       // 3. Map Real Settlements from Production (strictly isolate PLANT role at ₹10.00/can)
-      const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      const productionSettlements: SettlementRecord[] = [];
+      const now = new Date();
+      const currentHour = now.getHours();
+      const isEodCutoffPassedToday = currentHour >= 22; // 10:00 PM EOD
+      const todayStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const todayDateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      
+      const serverSettlements: SettlementRecord[] = [];
 
       const rawSettlements = settRes?.data?.settlements || (Array.isArray(settRes?.data) ? settRes?.data : []);
       if (Array.isArray(rawSettlements) && rawSettlements.length > 0) {
@@ -1173,13 +1183,19 @@ export function PlantDashboardScreen({ navigation }: any) {
           // Plant commission is ₹10.00 / can
           const parsedCommission = parsedAmount >= bCount * 5.0 ? parsedAmount : bCount * 10.00;
 
-          productionSettlements.push({
+          const rawDate = s.settlementDate || s.deliveryDate || s.created_at || s.settledAt;
+          const d = rawDate ? new Date(rawDate) : null;
+          const formattedDate = d && !isNaN(d.getTime())
+            ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : String(rawDate || todayDateStr).replace(/^Today,\s*/i, '');
+
+          serverSettlements.push({
             id: String(s.id || s._id || `SET_${Math.random().toString().slice(-4)}`),
             campaignTitle: String(s.campaignTitle || s.campaign_title || s.campaign_name || 'Commercial Batch'),
             brandName: String(s.entityName || s.payeeName || s.brand_name || 'Production Partner'),
             bottlesCount: bCount,
             commission: parsedCommission,
-            deliveryDate: String(s.settlementDate || s.deliveryDate || (s.created_at || s.settledAt ? new Date(s.created_at || s.settledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : todayStr)).replace(/^Today,\s*/i, ''),
+            deliveryDate: formattedDate,
             deliveryTime: dTime,
             locationTitle: locTitle,
             gpsCoords: gpsStr,
@@ -1189,31 +1205,52 @@ export function PlantDashboardScreen({ navigation }: any) {
         });
       }
 
-      // If backend has no settlements yet, dynamically synthesize settlements directly from the plant's actual active/completed work orders!
-      if (productionSettlements.length === 0 && mappedOrders.length > 0) {
-        const d0 = new Date();
-        const date0Str = d0.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        
-        mappedOrders.forEach((ord, oIdx) => {
-          const bCount = ord.bottledNum > 0 ? ord.bottledNum : ord.quantityNum;
-          if (bCount > 0) {
-            const resolvedGps = resolveLocationGps(ord.location);
-            productionSettlements.push({
-              id: `SET_ORD_${ord.id.slice(-6)}_${oIdx}`,
-              campaignTitle: ord.campaign,
-              brandName: ord.brand,
-              bottlesCount: bCount,
-              commission: bCount * 10.00,
-              deliveryDate: date0Str,
-              deliveryTime: '11:00 AM',
-              locationTitle: `${ord.location} Bottling Facility`,
-              gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-              ipAddress: `192.168.1.${100 + oIdx}`,
-              settlementStatus: ord.status === 'COMPLETED' ? 'SETTLED' : 'PENDING',
-            });
-          }
-        });
-      }
+      // Build dynamic campaign settlements from ALL active & completed campaign orders (Web parity)
+      const campaignSettlements: SettlementRecord[] = mappedOrders.map((ord, oIdx) => {
+        const isCompleted = ord.status === 'COMPLETED' || ord.bottledNum >= ord.quantityNum;
+        const count = isCompleted ? ord.quantityNum : (ord.bottledNum > 0 ? ord.bottledNum : ord.quantityNum);
+        const resolvedGps = resolveLocationGps(ord.location);
+        const resolvedIp = resolveLocationIp(ord.location);
+
+        const d = ord.startDate ? new Date(ord.startDate) : null;
+        const orderDateStartOfDay = d && !isNaN(d.getTime()) ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() : todayStartOfDay;
+        const isPastDay = orderDateStartOfDay < todayStartOfDay;
+        const isToday = orderDateStartOfDay === todayStartOfDay;
+        const isSettled = isPastDay || (isToday && isEodCutoffPassedToday) || isCompleted;
+
+        const formattedDate = d && !isNaN(d.getTime())
+          ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : todayDateStr;
+
+        return {
+          id: `SETTLE_PLT_${ord.id.replace(/[^a-zA-Z0-9]/g, '_').slice(-12)}_${oIdx}`,
+          campaignTitle: ord.campaign,
+          brandName: ord.brand || 'Brand Partner',
+          bottlesCount: count,
+          commission: count * 10.00,
+          deliveryDate: formattedDate,
+          deliveryTime: '10:00 PM EOD',
+          locationTitle: `${ord.location} Bottling Facility`,
+          gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
+          ipAddress: resolvedIp,
+          settlementStatus: isSettled ? 'SETTLED' : 'PENDING',
+        };
+      });
+
+      // Merge server settlements and campaign settlements with deduplication
+      const combined = [...serverSettlements, ...campaignSettlements];
+      const seenSettlementCampaigns = new Set<string>();
+      const productionSettlements: SettlementRecord[] = [];
+
+      combined.forEach((rec) => {
+        const normKey = (rec.campaignTitle || '').trim().toLowerCase();
+        if (normKey && !seenSettlementCampaigns.has(normKey)) {
+          seenSettlementCampaigns.add(normKey);
+          productionSettlements.push(rec);
+        } else if (!normKey) {
+          productionSettlements.push(rec);
+        }
+      });
 
       if (productionSettlements.length === 0) {
         const d0 = new Date();
