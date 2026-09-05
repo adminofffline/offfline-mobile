@@ -639,7 +639,7 @@ const PlantSettlementCardItem = React.memo(({
             {displayTitle}
           </Text>
           <Text style={styles.settlementCardSub} numberOfLines={1}>
-            {record.brandName || 'Brand Partner'}
+            {record.brandName || 'Brand Partner'} • {record.locationTitle || 'Bottling Facility'}
           </Text>
         </View>
 
@@ -647,8 +647,8 @@ const PlantSettlementCardItem = React.memo(({
           <View style={styles.settlementAmountChevronRow}>
             <Text style={styles.settlementCardAmount}>{formattedAmount}</Text>
             <ChevronDown
-              size={15}
-              color={isExpanded ? '#056B4A' : '#94A3B8'}
+              size={14}
+              color={isExpanded ? '#0F172A' : '#94A3B8'}
               style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}
             />
           </View>
@@ -658,31 +658,27 @@ const PlantSettlementCardItem = React.memo(({
       {/* Accordion Expandable Content */}
       {isExpanded && (
         <View style={styles.settlementAccordionContent}>
-          {/* Reference ID & Status Banner */}
-          <View style={styles.settlementAccordionRefRow}>
-            <View style={styles.settlementAccordionRefLeft}>
-              <Tag size={12} color="#056B4A" />
-              <Text style={styles.settlementAccordionRefLabel}>Ref ID:</Text>
-              <Text style={styles.settlementAccordionRefVal} numberOfLines={1}>
-                {record.id}
-              </Text>
-            </View>
+          {/* Reference ID & Status */}
+          <View style={styles.settlementAccordionHeaderRow}>
+            <Text style={styles.settlementAccordionRefText}>
+              Ref: <Text style={styles.settlementAccordionRefMono}>{record.id}</Text>
+            </Text>
             <View
               style={[
-                styles.appleSettleBadge,
-                isSettled ? styles.appleSettleBadgeSettled : styles.appleSettleBadgePending,
+                styles.minimalStatusPill,
+                isSettled ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
               ]}
             >
               <View
                 style={[
-                  styles.settleDot,
-                  isSettled ? styles.settleDotSettled : styles.settleDotPending,
+                  styles.minimalStatusDot,
+                  isSettled ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
                 ]}
               />
               <Text
                 style={[
-                  styles.appleSettleBadgeText,
-                  isSettled ? styles.appleSettleBadgeTextSettled : styles.appleSettleBadgeTextPending,
+                  styles.minimalStatusText,
+                  isSettled ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
                 ]}
               >
                 {isSettled ? 'Settled' : 'Pending Verification'}
@@ -690,35 +686,42 @@ const PlantSettlementCardItem = React.memo(({
             </View>
           </View>
 
-          {/* 4-Metric Grid */}
-          <View style={styles.settlementGrid}>
-            <View style={styles.settlementGridTile}>
-              <Text style={styles.settlementGridLabel}>Bottling Volume</Text>
-              <Text style={styles.settlementGridVal}>{record.bottlesCount.toLocaleString('en-IN')} 20L Cans</Text>
+          {/* Unified Clean 2-Column Specs Inset */}
+          <View style={styles.settlementSpecsInset}>
+            <View style={styles.settlementSpecGridRow}>
+              <View style={styles.settlementSpecCol}>
+                <Text style={styles.settlementSpecLabel}>VOLUME</Text>
+                <Text style={styles.settlementSpecVal}>{record.bottlesCount.toLocaleString('en-IN')} Cans (20L)</Text>
+              </View>
+              <View style={styles.settlementSpecCol}>
+                <Text style={styles.settlementSpecLabel}>PLANT RATE</Text>
+                <Text style={[styles.settlementSpecVal, { color: '#059669' }]}>₹10.00 / can</Text>
+              </View>
             </View>
-            <View style={styles.settlementGridTile}>
-              <Text style={styles.settlementGridLabel}>Plant Scanning Rate</Text>
-              <Text style={[styles.settlementGridVal, { color: '#056B4A' }]}>₹10.00 / Can Payout</Text>
-            </View>
-            <View style={styles.settlementGridTile}>
-              <Text style={styles.settlementGridLabel}>Assigned Facility</Text>
-              <Text style={styles.settlementGridVal} numberOfLines={1}>{record.locationTitle || 'Bottling Facility'}</Text>
-            </View>
-            <View style={styles.settlementGridTile}>
-              <Text style={styles.settlementGridLabel}>Settlement Time</Text>
-              <Text style={styles.settlementGridVal}>{record.deliveryTime || '10:30 AM'}</Text>
+
+            <View style={styles.settlementSpecDivider} />
+
+            <View style={styles.settlementSpecGridRow}>
+              <View style={styles.settlementSpecCol}>
+                <Text style={styles.settlementSpecLabel}>FACILITY</Text>
+                <Text style={styles.settlementSpecVal} numberOfLines={1}>{record.locationTitle || 'Bottling Facility'}</Text>
+              </View>
+              <View style={styles.settlementSpecCol}>
+                <Text style={styles.settlementSpecLabel}>SETTLEMENT TIME</Text>
+                <Text style={styles.settlementSpecVal}>{record.deliveryTime || '10:30 AM'}</Text>
+              </View>
             </View>
           </View>
 
-          {/* Action Button: View Full Statement Modal */}
+          {/* Action Button: Minimal Apple Pill */}
           <NativePressable
             style={styles.settlementViewStatementBtn}
             onPress={() => onViewModal(record)}
             hapticType="impactLight"
             scaleActive={0.97}
           >
-            <ExternalLink size={13} color="#FFFFFF" />
-            <Text style={styles.settlementViewStatementBtnText}>View Full Statement & Breakdown</Text>
+            <Text style={styles.settlementViewStatementBtnText}>View Full Statement</Text>
+            <ChevronRight size={13} color="#64748B" />
           </NativePressable>
         </View>
       )}
@@ -2115,14 +2118,14 @@ export function PlantDashboardScreen({ navigation }: any) {
                 </View>
 
                 {/* Header */}
-                <View style={styles.sheetHeaderRow}>
-                  <View style={styles.sheetHeaderLeft}>
-                    <View style={[styles.sheetHeaderIconSquircle, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                      <FileText size={20} color="#059669" />
+                <View style={styles.statementSheetHeader}>
+                  <View style={styles.statementSheetHeaderLeft}>
+                    <View style={styles.statementSheetIconSquircle}>
+                      <FileText size={18} color="#0F172A" />
                     </View>
-                    <View style={styles.sheetHeaderTitleWrap}>
-                      <Text style={styles.sheetHeaderTitle}>Settlement Statement & Audit</Text>
-                      <Text style={styles.statementRefSubtitle}>{selectedSettlementModal.id}</Text>
+                    <View style={styles.statementSheetHeaderTitles}>
+                      <Text style={styles.statementSheetTitle}>Settlement Statement</Text>
+                      <Text style={styles.statementSheetRef}>Ref ID: {selectedSettlementModal.id}</Text>
                     </View>
                   </View>
                   <NativePressable
@@ -2135,117 +2138,119 @@ export function PlantDashboardScreen({ navigation }: any) {
                   </NativePressable>
                 </View>
 
-                <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
-                  {/* Summary Net Payout Banner */}
-                  <View style={styles.statementNetBanner}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.statementNetBannerLabel}>NET DISBURSED PAYOUT</Text>
-                      <Text style={styles.statementNetBannerAmount}>
-                        +₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <ScrollView
+                  style={styles.statementModalScroll}
+                  contentContainerStyle={styles.statementModalScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Hero Amount Card */}
+                  <View style={styles.statementHeroCard}>
+                    <Text style={styles.statementHeroLabel}>NET DISBURSED PAYOUT</Text>
+                    <Text style={styles.statementHeroAmount}>
+                      +₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                    <View style={styles.statementHeroMetaRow}>
+                      <Text style={styles.statementHeroSubtitle} numberOfLines={1}>
+                        {displayTitle} • {selectedSettlementModal.brandName}
                       </Text>
-                      <Text style={styles.statementNetBannerSub} numberOfLines={1}>
-                        {displayTitle} ({selectedSettlementModal.brandName})
-                      </Text>
-                    </View>
-                    <View style={styles.statementStatusPill}>
-                      <View style={[styles.settleDot, isSettled ? styles.settleDotSettled : styles.settleDotPending]} />
-                      <Text style={styles.statementStatusPillText}>
-                        {isSettled ? '✓ Settled via Banking' : 'Pending EOD Settlement'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Itemized Bottling & Payout Summary */}
-                  <View style={styles.statementSectionCard}>
-                    <View style={styles.statementSectionHeader}>
-                      <Layers size={14} color="#0891B2" />
-                      <Text style={styles.statementSectionTitle}>ITEMIZED BOTTLING & PAYOUT SUMMARY</Text>
-                    </View>
-                    <View style={styles.statementTable}>
-                      <View style={styles.statementTableRow}>
-                        <Text style={styles.statementTableLabel}>SAC Code / Service:</Text>
-                        <Text style={styles.statementTableValBold}>998361 (Water Media Advertising)</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <Text style={styles.statementTableLabel}>Verified Bottling Output:</Text>
-                        <Text style={styles.statementTableValBold}>{selectedSettlementModal.bottlesCount.toLocaleString('en-IN')} × 20L Water Cans</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <Text style={styles.statementTableLabel}>Guaranteed Plant Scanning Rate:</Text>
-                        <Text style={[styles.statementTableValBold, { color: '#059669' }]}>₹10.00 / Can</Text>
-                      </View>
-                      <View style={[styles.statementTableRow, styles.statementTableDivider]}>
-                        <Text style={styles.statementTableLabel}>Gross Production Value:</Text>
-                        <Text style={styles.statementTableValBold}>₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <Text style={styles.statementTableLabel}>TDS (2%) / Tax Compliance:</Text>
-                        <Text style={[styles.statementTableVal, { color: '#64748B' }]}>Auto-Reconciled</Text>
-                      </View>
-                      <View style={[styles.statementTableRow, styles.statementTableHighlight]}>
-                        <Text style={styles.statementTableTotalLabel}>Total Net Disbursed:</Text>
-                        <Text style={styles.statementTableTotalVal}>₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                      <View
+                        style={[
+                          styles.minimalStatusPill,
+                          isSettled ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.minimalStatusDot,
+                            isSettled ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.minimalStatusText,
+                            isSettled ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
+                          ]}
+                        >
+                          {isSettled ? 'Settled' : 'Pending'}
+                        </Text>
                       </View>
                     </View>
                   </View>
 
-                  {/* Physical Node & GPS Telemetry Ledger */}
-                  <View style={styles.statementSectionCard}>
-                    <View style={styles.statementSectionHeader}>
-                      <ShieldCheck size={14} color="#059669" />
-                      <Text style={styles.statementSectionTitle}>PHYSICAL NODE & GPS TELEMETRY LEDGER</Text>
+                  {/* Section 1: Itemized Summary */}
+                  <View style={styles.statementSectionBox}>
+                    <Text style={styles.statementBoxTitle}>ITEMIZED BREAKDOWN</Text>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>SAC Code / Service</Text>
+                      <Text style={styles.statementSpecValueBold}>998361 (Water Media)</Text>
                     </View>
-                    <View style={styles.statementTable}>
-                      <View style={styles.statementTableRow}>
-                        <View style={styles.statementTelemetryLeft}>
-                          <MapPin size={12} color="#6366F1" />
-                          <Text style={styles.statementTableLabel}>Plant Facility:</Text>
-                        </View>
-                        <Text style={styles.statementTableValBold} numberOfLines={1}>{selectedSettlementModal.locationTitle || 'Bottling Facility'}</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <View style={styles.statementTelemetryLeft}>
-                          <Sparkles size={12} color="#06B6D4" />
-                          <Text style={styles.statementTableLabel}>GPS Coordinates:</Text>
-                        </View>
-                        <Text style={styles.statementTableValMono}>{selectedSettlementModal.gpsCoords || '13.0827° N, 80.2707° E'}</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <View style={styles.statementTelemetryLeft}>
-                          <Clock size={12} color="#F59E0B" />
-                          <Text style={styles.statementTableLabel}>Production EOD Timestamp:</Text>
-                        </View>
-                        <Text style={styles.statementTableValBold}>{selectedSettlementModal.deliveryDate} at {selectedSettlementModal.deliveryTime || '10:30 AM'}</Text>
-                      </View>
-                      <View style={styles.statementTableRow}>
-                        <View style={styles.statementTelemetryLeft}>
-                          <ShieldCheck size={12} color="#10B981" />
-                          <Text style={styles.statementTableLabel}>Node Server IP:</Text>
-                        </View>
-                        <Text style={styles.statementTableValMono}>{selectedSettlementModal.ipAddress || '127.0.0.1'}</Text>
-                      </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Verified Bottling Output</Text>
+                      <Text style={styles.statementSpecValueBold}>{selectedSettlementModal.bottlesCount.toLocaleString('en-IN')} × 20L Cans</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Plant Scanning Rate</Text>
+                      <Text style={[styles.statementSpecValueBold, { color: '#059669' }]}>₹10.00 / Can</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Gross Production Value</Text>
+                      <Text style={styles.statementSpecValueBold}>₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Tax / TDS Compliance</Text>
+                      <Text style={styles.statementSpecValueMuted}>Auto-Reconciled (TDS 2%)</Text>
+                    </View>
+                    <View style={styles.statementSpecDivider} />
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecTotalKey}>Total Net Disbursed</Text>
+                      <Text style={styles.statementSpecTotalVal}>₹{selectedSettlementModal.commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                    </View>
+                  </View>
+
+                  {/* Section 2: Audit & Node Telemetry */}
+                  <View style={styles.statementSectionBox}>
+                    <Text style={styles.statementBoxTitle}>NODE & AUDIT TELEMETRY</Text>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Plant Facility</Text>
+                      <Text style={styles.statementSpecValueBold} numberOfLines={1}>{selectedSettlementModal.locationTitle || 'Bottling Facility'}</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>GPS Coordinates</Text>
+                      <Text style={styles.statementSpecValueMono}>{selectedSettlementModal.gpsCoords || '13.0827° N, 80.2707° E'}</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Production Timestamp</Text>
+                      <Text style={styles.statementSpecValueBold}>{selectedSettlementModal.deliveryDate} • {selectedSettlementModal.deliveryTime || '10:30 AM'}</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Ledger Node Server</Text>
+                      <Text style={styles.statementSpecValueMono}>{selectedSettlementModal.ipAddress || '127.0.0.1'}</Text>
+                    </View>
+                    <View style={styles.statementSpecRow}>
+                      <Text style={styles.statementSpecKey}>Audit Status</Text>
+                      <Text style={[styles.statementSpecValueBold, { color: '#059669' }]}>Cryptographically Verified ✓</Text>
                     </View>
                   </View>
                 </ScrollView>
 
-                {/* Action Buttons */}
-                <View style={styles.statementActionRow}>
+                {/* Bottom Action Row (Pinned & Guaranteed Full Height) */}
+                <View style={styles.statementBottomActionRow}>
                   <NativePressable
-                    style={styles.statementShareBtn}
+                    style={styles.statementSecondaryActionBtn}
                     onPress={handleShareStatement}
                     hapticType="impactLight"
                     scaleActive={0.97}
                   >
                     <Share2 size={15} color="#0F172A" />
-                    <Text style={styles.statementShareBtnText}>Share Statement</Text>
+                    <Text style={styles.statementSecondaryActionBtnText}>Share Statement</Text>
                   </NativePressable>
                   <NativePressable
-                    style={styles.statementCloseBtn}
+                    style={styles.statementPrimaryActionBtn}
                     onPress={close}
                     hapticType="impactLight"
                     scaleActive={0.97}
                   >
-                    <Text style={styles.statementCloseBtnText}>Close</Text>
+                    <Text style={styles.statementPrimaryActionBtnText}>Done</Text>
                   </NativePressable>
                 </View>
               </View>
@@ -2980,11 +2985,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   settlementCardContainerExpanded: {
-    borderColor: '#056B4A',
-    borderWidth: 1.2,
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderColor: '#CBD5E1',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   settlementAmountChevronRow: {
     flexDirection: 'row',
@@ -2994,251 +2998,289 @@ const styles = StyleSheet.create({
   settlementAccordionContent: {
     paddingHorizontal: 14,
     paddingBottom: 14,
-    paddingTop: 8,
-    backgroundColor: '#F8FAFC',
+    paddingTop: 10,
+    backgroundColor: '#FAFCFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     gap: 10,
   },
-  settlementAccordionRefRow: {
+  settlementAccordionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  settlementAccordionRefLeft: {
+  settlementAccordionRefText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  settlementAccordionRefMono: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  minimalStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    flex: 1,
-    marginRight: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 999,
   },
-  settlementAccordionRefLabel: {
-    fontSize: 11,
-    color: '#64748B',
+  minimalStatusPillSettled: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  minimalStatusPillPending: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  minimalStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  minimalStatusDotSettled: {
+    backgroundColor: '#059669',
+  },
+  minimalStatusDotPending: {
+    backgroundColor: '#D97706',
+  },
+  minimalStatusText: {
+    fontSize: 10.5,
     fontWeight: '600',
   },
-  settlementAccordionRefVal: {
-    fontSize: 11,
-    color: '#0F172A',
-    fontWeight: '800',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    flex: 1,
+  minimalStatusTextSettled: {
+    color: '#065F46',
   },
-  settlementGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  minimalStatusTextPending: {
+    color: '#92400E',
   },
-  settlementGridTile: {
-    width: '48.5%',
+  settlementSpecsInset: {
     backgroundColor: '#FFFFFF',
-    padding: 9,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    padding: 12,
   },
-  settlementGridLabel: {
+  settlementSpecGridRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settlementSpecCol: {
+    flex: 1,
+  },
+  settlementSpecLabel: {
     fontSize: 9.5,
+    fontWeight: '600',
     color: '#94A3B8',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.2,
+    letterSpacing: 0.5,
     marginBottom: 2,
+    textTransform: 'uppercase',
   },
-  settlementGridVal: {
-    fontSize: 11.5,
-    fontWeight: '800',
+  settlementSpecVal: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#0F172A',
+  },
+  settlementSpecDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 8,
   },
   settlementViewStatementBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#056B4A',
+    gap: 5,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingVertical: 9,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    marginTop: 2,
+    borderRadius: 10,
   },
   settlementViewStatementBtnText: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 11.5,
-    fontWeight: '800',
-  },
-
-  // ── Statement Modal Spec Styles ──
-  statementRefSubtitle: {
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    color: '#94A3B8',
     fontWeight: '600',
   },
-  statementNetBanner: {
+
+  // ── Statement Modal Styles ──
+  statementSheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
+    paddingBottom: 12,
   },
-  statementNetBannerLabel: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#065F46',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  statementNetBannerAmount: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#064E3B',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginVertical: 2,
-  },
-  statementNetBannerSub: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#047857',
-  },
-  statementStatusPill: {
+  statementSheetHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#D1FAE5',
+    gap: 10,
+    flex: 1,
+  },
+  statementSheetIconSquircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#6EE7B7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statementStatusPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#065F46',
+  statementSheetHeaderTitles: {
+    flex: 1,
   },
-  statementSectionCard: {
+  statementSheetTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  statementSheetRef: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  statementModalScroll: {
+    maxHeight: Math.min(320, Dimensions.get('window').height * 0.42),
+  },
+  statementModalScrollContent: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  statementHeroCard: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: 14,
+    padding: 14,
   },
-  statementSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-  },
-  statementSectionTitle: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#334155',
-    letterSpacing: 0.4,
+  statementHeroLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  statementTable: {
-    gap: 7,
+  statementHeroAmount: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginVertical: 4,
   },
-  statementTableRow: {
+  statementHeroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statementHeroSubtitle: {
+    fontSize: 11.5,
+    color: '#64748B',
+    fontWeight: '500',
+    flex: 1,
+  },
+  statementSectionBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  statementBoxTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  statementSpecRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  statementTableLabel: {
+  statementSpecKey: {
     fontSize: 11.5,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '400',
   },
-  statementTableVal: {
+  statementSpecValueBold: {
     fontSize: 11.5,
     color: '#0F172A',
     fontWeight: '600',
   },
-  statementTableValBold: {
+  statementSpecValueMuted: {
     fontSize: 11.5,
-    color: '#0F172A',
-    fontWeight: '800',
+    color: '#94A3B8',
+    fontWeight: '500',
   },
-  statementTableValMono: {
+  statementSpecValueMono: {
     fontSize: 11,
     color: '#0F172A',
-    fontWeight: '700',
+    fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  statementTableDivider: {
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+  statementSpecDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 6,
   },
-  statementTableHighlight: {
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#CBD5E1',
-  },
-  statementTableTotalLabel: {
+  statementSpecTotalKey: {
     fontSize: 12,
-    fontWeight: '900',
-    color: '#065F46',
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  statementTableTotalVal: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#065F46',
+  statementSpecTotalVal: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0F172A',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  statementTelemetryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  statementActionRow: {
+  statementBottomActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginTop: 12,
-    paddingTop: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
-  statementShareBtn: {
+  statementSecondaryActionBtn: {
     flex: 1,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 11,
-    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  statementShareBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
+  statementSecondaryActionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#0F172A',
   },
-  statementCloseBtn: {
+  statementPrimaryActionBtn: {
     flex: 1,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#056B4A',
-    paddingVertical: 11,
-    borderRadius: 14,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
   },
-  statementCloseBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
+  statementPrimaryActionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   sheetCloseButton: {
