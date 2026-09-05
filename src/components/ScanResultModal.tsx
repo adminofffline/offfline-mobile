@@ -219,7 +219,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
                     !isSuccess && !isDuplicate && styles.badgeTextError,
                   ]}
                 >
-                  {isSuccess ? 'VERIFIED' : isDuplicate ? 'DUPLICATE' : 'REJECTED'}
+                  {isSuccess ? 'VERIFIED' : isDuplicate ? 'ALREADY SCANNED' : 'REJECTED'}
                 </Text>
               </View>
 
@@ -290,6 +290,23 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
                 </Text>
               </View>
             </TouchableOpacity>
+
+            {/* Duplicate Notice Hero Banner */}
+            {isDuplicate && (
+              <View style={styles.duplicateNoticeCard}>
+                <View style={styles.duplicateNoticeLeft}>
+                  <View style={styles.duplicateIconCircle}>
+                    <AlertTriangle size={18} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.duplicateNoticeTitle}>PREVIOUSLY RECORDED CAN</Text>
+                    <Text style={styles.duplicateNoticeSubtext}>
+                      This QR has already been scanned & verified. Duplicate scans do not increment production or delivery counts.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Payout & Earnings Hero Banner */}
             {isSuccess && (
@@ -598,6 +615,40 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 11,
     fontWeight: '600',
+  },
+  duplicateNoticeCard: {
+    backgroundColor: 'rgba(180, 83, 9, 0.16)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  duplicateNoticeLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  duplicateIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(245, 158, 11, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  duplicateNoticeTitle: {
+    color: '#FBBF24',
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  duplicateNoticeSubtext: {
+    color: '#FDE68A',
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   payoutCard: {
     flexDirection: 'row',

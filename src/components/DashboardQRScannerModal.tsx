@@ -30,6 +30,7 @@ import {
   Check,
   Camera as CameraIcon,
   ShieldAlert,
+  AlertTriangle,
   ArrowRight,
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -235,9 +236,18 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           if (res) {
             const isDup = Boolean(res.already_scanned || res.is_rescan);
             if (isDup) {
+              const dupCode = res.can_id || cleanCode;
               sessionScannedCodesRef.current.add(cleanCode);
               ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
-              flashHud('DUPLICATE', `⚠️ Already Recorded: ${res.can_id || cleanCode}`, res.can_id || cleanCode);
+              setLastScannedCode(dupCode);
+              badgeAnim.setValue(1);
+              Animated.timing(badgeAnim, {
+                toValue: 0,
+                duration: 2500,
+                delay: 1200,
+                useNativeDriver: true,
+              }).start();
+              flashHud('DUPLICATE', `⚠️ Already Scanned: ${dupCode}`, dupCode);
               return;
             }
 
@@ -261,7 +271,15 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         if (isDup) {
           sessionScannedCodesRef.current.add(cleanCode);
           ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
-          flashHud('DUPLICATE', `⚠️ Already Scanned`, cleanCode);
+          setLastScannedCode(cleanCode);
+          badgeAnim.setValue(1);
+          Animated.timing(badgeAnim, {
+            toValue: 0,
+            duration: 2500,
+            delay: 1200,
+            useNativeDriver: true,
+          }).start();
+          flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
         } else {
           ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
           flashHud('ERROR', err?.response?.data?.message || 'Scan unverified', cleanCode);
@@ -494,10 +512,10 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         <View style={styles.scannerBody} pointerEvents="box-none">
           {/* Minimal 4-Corner Viewfinder Reticle */}
           <View style={styles.viewfinderFrame} pointerEvents="box-none">
-            <View style={[styles.cornerBracket, styles.cornerTopLeft]} />
-            <View style={[styles.cornerBracket, styles.cornerTopRight]} />
-            <View style={[styles.cornerBracket, styles.cornerBottomLeft]} />
-            <View style={[styles.cornerBracket, styles.cornerBottomRight]} />
+            <View style={[styles.cornerBracket, styles.cornerTopLeft, hudFeedback.status === 'DUPLICATE' && styles.cornerBracketWarning]} />
+            <View style={[styles.cornerBracket, styles.cornerTopRight, hudFeedback.status === 'DUPLICATE' && styles.cornerBracketWarning]} />
+            <View style={[styles.cornerBracket, styles.cornerBottomLeft, hudFeedback.status === 'DUPLICATE' && styles.cornerBracketWarning]} />
+            <View style={[styles.cornerBracket, styles.cornerBottomRight, hudFeedback.status === 'DUPLICATE' && styles.cornerBracketWarning]} />
 
             {/* Subtle Scanning Laser Beam (Offfline Signature Warm Gold) */}
             <Animated.View
@@ -531,7 +549,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             {hudFeedback.status === 'SUCCESS' ? (
               <CheckCircle2 size={13} color="#10B981" />
             ) : hudFeedback.status === 'DUPLICATE' ? (
-              <Zap size={13} color="#F59E0B" />
+              <AlertTriangle size={13} color="#F59E0B" />
             ) : hudFeedback.status === 'ERROR' ? (
               <ShieldAlert size={13} color="#EF4444" />
             ) : sessionCount > 0 ? (
@@ -559,10 +577,26 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
 
           {/* Minimal Last Scanned Code Pill */}
           {lastScannedCode && (
-            <Animated.View style={[styles.lastScanPill, { opacity: badgeAnim }]}>
-              <Check size={11} color="#A7F3D0" />
-              <Text style={styles.lastScanText} numberOfLines={1}>
-                {lastScannedCode}
+            <Animated.View
+              style={[
+                styles.lastScanPill,
+                hudFeedback.status === 'DUPLICATE' ? styles.lastScanPillWarning : styles.lastScanPillSuccess,
+                { opacity: badgeAnim },
+              ]}
+            >
+              {hudFeedback.status === 'DUPLICATE' ? (
+                <AlertTriangle size={11} color="#F59E0B" />
+              ) : (
+                <Check size={11} color="#A7F3D0" />
+              )}
+              <Text
+                style={[
+                  styles.lastScanText,
+                  hudFeedback.status === 'DUPLICATE' ? styles.lastScanTextWarning : styles.lastScanTextSuccess,
+                ]}
+                numberOfLines={1}
+              >
+                {hudFeedback.status === 'DUPLICATE' ? `⚠️ ALREADY SCANNED: ${lastScannedCode}` : lastScannedCode}
               </Text>
             </Animated.View>
           )}
@@ -842,6 +876,9 @@ const styles = StyleSheet.create({
     height: 32,
     borderColor: '#F5F1E8',
   },
+  cornerBracketWarning: {
+    borderColor: '#F59E0B',
+  },
   cornerTopLeft: {
     top: 0,
     left: 0,
@@ -941,20 +978,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(5, 107, 74, 0.20)',
     borderWidth: 1,
-    borderColor: 'rgba(5, 107, 74, 0.45)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 9999,
     marginTop: 8,
   },
+  lastScanPillSuccess: {
+    backgroundColor: 'rgba(5, 107, 74, 0.20)',
+    borderColor: 'rgba(5, 107, 74, 0.45)',
+  },
+  lastScanPillWarning: {
+    backgroundColor: 'rgba(180, 83, 9, 0.28)',
+    borderColor: 'rgba(245, 158, 11, 0.65)',
+  },
   lastScanText: {
-    color: '#10B981',
     fontSize: 11.5,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     letterSpacing: 0.5,
+  },
+  lastScanTextSuccess: {
+    color: '#10B981',
+  },
+  lastScanTextWarning: {
+    color: '#F59E0B',
+    fontWeight: '700',
   },
   bottomDockSafeArea: {
     paddingHorizontal: 16,

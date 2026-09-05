@@ -426,6 +426,8 @@ const DistributorScanCardItem = React.memo(({
   scan: ScanRecord;
   onSelect: (scan: ScanRecord) => void;
 }) => {
+  const isDuplicate = scan.status === 'DUPLICATE' || scan.status === 'ALREADY_SCANNED' || scan.status === 'RESCAN';
+
   return (
     <NativePressable
       style={styles.scanCard}
@@ -442,10 +444,17 @@ const DistributorScanCardItem = React.memo(({
         </View>
       </View>
       <View style={styles.scanCardRight}>
-        <View style={styles.appleVerifiedPill}>
-          <View style={styles.verifiedDot} />
-          <Text style={styles.appleVerifiedText}>Verified</Text>
-        </View>
+        {isDuplicate ? (
+          <View style={styles.appleDuplicatePill}>
+            <View style={styles.duplicateDot} />
+            <Text style={styles.appleDuplicateText}>Already Scanned</Text>
+          </View>
+        ) : (
+          <View style={styles.appleVerifiedPill}>
+            <View style={styles.verifiedDot} />
+            <Text style={styles.appleVerifiedText}>Verified</Text>
+          </View>
+        )}
         <Text style={styles.scanTime}>{scan.deliveryTime}</Text>
       </View>
     </NativePressable>
@@ -699,7 +708,19 @@ export function DistributorDashboardScreen({ navigation }: any) {
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
           if (isRescan) {
-            triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already delivered!`);
+            const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
+            const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const dupScan: ScanRecord = {
+              id: res.data.scan_id || `SCN_DUP_${Date.now()}_${Math.random()}`,
+              can_id: canId,
+              campaign_title: res.data.campaign_title || res.data.campaign?.title || 'Live Delivery Batch',
+              location_name: res.data.location_name || 'Chennai Central Hub',
+              deliveryTime: formattedDeliveryTime,
+              payout_amount: 0.00,
+              status: 'ALREADY_SCANNED',
+            };
+            setScans((prev) => [dupScan, ...prev]);
+            triggerToast(`⚠️ Already Scanned: QR (${canId}) was already delivered!`);
             return res.data;
           }
 
@@ -744,6 +765,18 @@ export function DistributorDashboardScreen({ navigation }: any) {
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
         if (isDup) {
+          const canId = cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`;
+          const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dupScan: ScanRecord = {
+            id: `SCN_DUP_${Date.now()}_${Math.random()}`,
+            can_id: canId,
+            campaign_title: 'Live Delivery Batch',
+            location_name: 'Chennai Central Hub',
+            deliveryTime: formattedDeliveryTime,
+            payout_amount: 0.00,
+            status: 'ALREADY_SCANNED',
+          };
+          setScans((prev) => [dupScan, ...prev]);
           triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already delivered!`);
           return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
         }
@@ -1592,23 +1625,62 @@ export function DistributorDashboardScreen({ navigation }: any) {
                       <Text style={styles.sheetHeaderBrandText} numberOfLines={1}>
                         {currentRecord.campaign_title}
                       </Text>
-                      <View style={styles.appleVerifiedPill}>
-                        <View style={styles.verifiedDot} />
-                        <Text style={styles.appleVerifiedText}>Verified</Text>
-                      </View>
+                      {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE' ? (
+                        <View style={styles.appleDuplicatePill}>
+                          <View style={styles.duplicateDot} />
+                          <Text style={styles.appleDuplicateText}>Already Scanned</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.appleVerifiedPill}>
+                          <View style={styles.verifiedDot} />
+                          <Text style={styles.appleVerifiedText}>Verified</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </View>
               </View>
 
               {/* ── Delivery Time Banner ── */}
-              <View style={styles.sheetDeliveryBanner}>
-                <View style={styles.sheetDeliveryIconCircle}>
-                  <Check size={16} color="#059669" />
+              <View
+                style={[
+                  styles.sheetDeliveryBanner,
+                  (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerWarning,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.sheetDeliveryIconCircle,
+                    (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryIconCircleWarning,
+                  ]}
+                >
+                  {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE' ? (
+                    <AlertCircle size={16} color="#D97706" />
+                  ) : (
+                    <Check size={16} color="#059669" />
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.sheetDeliveryBannerTitle}>Delivery Logged to Production</Text>
-                  <Text style={styles.sheetDeliveryBannerSub}>Recorded {currentRecord.deliveryTime}</Text>
+                  <Text
+                    style={[
+                      styles.sheetDeliveryBannerTitle,
+                      (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerTitleWarning,
+                    ]}
+                  >
+                    {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE'
+                      ? 'Duplicate Scan Detected'
+                      : 'Delivery Logged to Production'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sheetDeliveryBannerSub,
+                      (currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE') && styles.sheetDeliveryBannerSubWarning,
+                    ]}
+                  >
+                    {currentRecord.status === 'ALREADY_SCANNED' || currentRecord.status === 'DUPLICATE'
+                      ? `Previously scanned & recorded • ${currentRecord.deliveryTime}`
+                      : `Recorded ${currentRecord.deliveryTime}`}
+                  </Text>
                 </View>
               </View>
 
@@ -2044,6 +2116,26 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#059669',
+  },
+  appleDuplicatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  duplicateDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D97706',
+  },
+  appleDuplicateText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#D97706',
   },
   scanTime: {
     fontSize: 11.5,
@@ -2907,6 +2999,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     gap: 10,
   },
+  sheetDeliveryBannerWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
   sheetDeliveryIconCircle: {
     width: 30,
     height: 30,
@@ -2915,16 +3011,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sheetDeliveryIconCircleWarning: {
+    backgroundColor: '#FDE68A',
+  },
   sheetDeliveryBannerTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: '#15803D',
+  },
+  sheetDeliveryBannerTitleWarning: {
+    color: '#B45309',
   },
   sheetDeliveryBannerSub: {
     fontSize: 11.5,
     fontWeight: '500',
     color: '#16A34A',
     marginTop: 1,
+  },
+  sheetDeliveryBannerSubWarning: {
+    color: '#D97706',
   },
 
   // Apple Inset Grouped Specs List
