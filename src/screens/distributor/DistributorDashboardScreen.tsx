@@ -1276,11 +1276,16 @@ export function DistributorDashboardScreen({ navigation }: any) {
     [profileAddress]
   );
 
-  const handleCompleteScanSession = useCallback((_totalScannedInSession: number) => {
+  const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
-    setToastData(null);
-    loadProductionData().catch(() => {});
-  }, [loadProductionData]);
+    if (totalScannedInSession > 0) {
+      setTimeout(() => {
+        triggerToast(`🎉 Batch of ${totalScannedInSession.toLocaleString()} cans recorded & verified!`);
+      }, 400); // Wait for modal to fully close
+    } else {
+      setToastData(null);
+    }
+  }, [triggerToast]);
 
   // ── Handle Real QR Scan Submission on Production ──
   const handlePerformLiveScan = useCallback(() => {

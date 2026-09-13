@@ -235,7 +235,8 @@ export const AppleCelebrationToast: React.FC<AppleCelebrationToastProps> = ({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [toastData, translateY, opacity, scale, iconScale, confettiAnim, dismiss]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toastData]);
 
   if (!toastData) return null;
 
