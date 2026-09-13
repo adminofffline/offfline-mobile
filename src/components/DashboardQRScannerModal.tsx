@@ -231,24 +231,42 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   // Process a scanned code through extractCleanQrId and onScan
   const processCode = useCallback(
     async (rawVal: string, isManual = false) => {
-      if (!isManual && isProcessingRef.current) {
-        return;
-      }
+      isProcessingRef.current = true;
 
       const cleanCode = extractCleanQrId(rawVal);
-      if (!cleanCode || cleanCode.length < 3) return;
+      if (!cleanCode || cleanCode.length < 3) {
+        isProcessingRef.current = false;
+        return;
+      }
       const canonicalUrl = toCanonicalQrUrl(rawVal);
 
       // In continuous camera mode, avoid repeat triggers on the exact code/URL already processed in this active session
       if (!isManual && (sessionScannedUrlsRef.current.has(canonicalUrl) || sessionScannedCodesRef.current.has(cleanCode))) {
-        flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
+        ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
         setLastScannedCode(cleanCode);
+        flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
+        const dupData: ScanResultData = {
+          status: 'DUPLICATE',
+          title: '⚠️ Already Scanned',
+          message: 'This QR code was already verified and recorded in this session.',
+          qrId: cleanCode,
+          canId: cleanCode,
+          campaignTitle: formatCampaignTitle(activeCampaignTitle),
+          brandName: activeCampaignBrand,
+          scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        scanResultDataRef.current = dupData;
+        setScanResultData(dupData);
         return;
       }
 
       const now = Date.now();
       const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
-      if (!isManual && now - lastScannedTime < 2000) return;
+      if (!isManual && now - lastScannedTime < 1500) {
+        isProcessingRef.current = false;
+        return;
+      }
       recentCodesRef.current.set(cleanCode, now);
 
       if (recentCodesRef.current.size > 50) {
@@ -257,7 +275,6 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         });
       }
 
-      isProcessingRef.current = true;
       try {
         const result = onScan(cleanCode);
         if (result && typeof (result as any).then === 'function') {
@@ -340,6 +357,21 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               };
               scanResultDataRef.current = successData;
               setScanResultData(successData);
+            } else {
+              ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
+              const errMsg = res.message || 'Verification failed';
+              flashHud('ERROR', errMsg, cleanCode);
+              const errData: ScanResultData = {
+                status: 'ERROR',
+                title: '❌ Verification Failed',
+                message: errMsg,
+                qrId: cleanCode,
+                canId: res.can_id || cleanCode,
+                scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              };
+              scanResultDataRef.current = errData;
+              setScanResultData(errData);
             }
           }
         }
@@ -420,23 +452,20 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     [onScan, triggerScanFeedback, flashHud, activeCampaignTitle, activeCampaignBrand, isPlant]
   );
 
-  // VisionCamera code scanner (strictly 'qr' codes)
+  // VisionCamera code scanner (supports 'qr', 'ean-13', 'code-128')
   const codeScanner = useCodeScanner({
-    codeTypes: ['qr'],
+    codeTypes: ['qr', 'ean-13', 'code-128'],
     onCodeScanned: (codes) => {
       const now = Date.now();
       // Atomic lock & debounce:
-      // If currently processing, popup visible, or within 2000ms cooldown: DROP FRAME
-      if (isProcessingRef.current || scanResultDataRef.current != null || (now - lastScanTimestampRef.current < 2000)) {
+      // If currently processing, popup visible, or within 1500ms cooldown: DROP FRAME
+      if (isProcessingRef.current || scanResultDataRef.current != null || (now - lastScanTimestampRef.current < 1500)) {
         return;
       }
       const firstVal = codes[0]?.value;
       if (!firstVal) return;
 
-      // Synchronously lock IMMEDIATELY on first frame detection before any async code runs
-      isProcessingRef.current = true;
       lastScanTimestampRef.current = now;
-
       processCode(firstVal);
     },
   });
@@ -618,8 +647,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           <VisionCamera
             style={StyleSheet.absoluteFill}
             device={cameraDevice}
-            isActive={!scanResultData}
-            codeScanner={!scanResultData ? codeScanner : undefined}
+            isActive={true}
+            codeScanner={codeScanner}
             torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
             enableZoomGesture
           />
