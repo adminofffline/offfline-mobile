@@ -1391,7 +1391,6 @@ export function PlantDashboardScreen({ navigation }: any) {
 
         // Single Source of Truth: Prevent duplicate counting if canonical QR URL was already scanned
         if (scannedQrUrlsRef.current.has(canonicalUrl)) {
-          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
           return {
             success: false,
             already_scanned: true,
@@ -1423,7 +1422,6 @@ export function PlantDashboardScreen({ navigation }: any) {
           if (isRescan) {
             scannedQrUrlsRef.current.add(canonicalUrl);
             setScannedQrUrls(new Set(scannedQrUrlsRef.current));
-            triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already recorded!`);
             return res.data;
           }
 
@@ -1479,8 +1477,6 @@ export function PlantDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
-          // Exactly ONE toast notification for the scan action
-          triggerToast(`✓ Can ${canIdentifier} verified & bottled! (${returnedBrand})`);
           return res.data;
         }
         return res.data;
@@ -1497,12 +1493,9 @@ export function PlantDashboardScreen({ navigation }: any) {
             scannedQrUrlsRef.current.add(canonicalUrl);
             setScannedQrUrls(new Set(scannedQrUrlsRef.current));
           }
-          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already recorded!`);
           return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode, qr_url: canonicalUrl };
         }
 
-        const errMsg = err?.response?.data?.message || 'Scan verification failed';
-        triggerToast(`❌ ${errMsg}`);
         throw err;
       } finally {
         setTimeout(() => {
@@ -1510,7 +1503,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         }, 1000);
       }
     },
-    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, triggerToast]
+    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay]
   );
 
   const handleSimulateBulkPlant = useCallback(
@@ -1582,15 +1575,11 @@ export function PlantDashboardScreen({ navigation }: any) {
     [selectedScanCampaign, orders, currentLocationDisplay]
   );
 
-  const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
+  const handleCompleteScanSession = useCallback((_totalScannedInSession: number) => {
     setShowQrModal(false);
-    // Only trigger batch celebration toast if multiple cans were scanned in this session
-    // (a single scan already surfaced its own dedicated toast)
-    if (totalScannedInSession > 1) {
-      triggerToast(`🎉 Batch of ${totalScannedInSession} cans recorded & verified!`);
-    }
+    setToastData(null);
     loadProductionData().catch(() => {});
-  }, [loadProductionData, triggerToast]);
+  }, [loadProductionData]);
 
   // ── Live QR Scan Execution on Production Server (Instant 0ms) ──
   const handlePerformLiveScan = useCallback(() => {
@@ -2182,7 +2171,10 @@ export function PlantDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE SERVER SYNC ── */}
       <DashboardQRScannerModal
         visible={showQrModal}
-        onClose={() => setShowQrModal(false)}
+        onClose={() => {
+          setShowQrModal(false);
+          setToastData(null);
+        }}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkPlant}
@@ -2528,36 +2520,12 @@ export function PlantDashboardScreen({ navigation }: any) {
                       <DocSheetIcon size={18} color="#0F172A" />
                     </View>
                     <View style={styles.statementSheetHeaderTitles}>
-                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1} ellipsizeMode="tail">
                         {displayTitle}
                       </Text>
-                      <View style={styles.sheetHeaderSubRow}>
-                        <Text style={styles.statementSheetRef} numberOfLines={1}>
-                          {currentDetailOrder.brand || 'Brand Partner'}
-                        </Text>
-                        <View
-                          style={[
-                            styles.minimalStatusPill,
-                            isCompleted ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
-                            { marginLeft: 8 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.minimalStatusDot,
-                              isCompleted ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.minimalStatusText,
-                              isCompleted ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
-                            ]}
-                          >
-                            {isCompleted ? 'Completed' : 'In Progress'}
-                          </Text>
-                        </View>
-                      </View>
+                      <Text style={styles.statementSheetRef} numberOfLines={1} ellipsizeMode="tail">
+                        {currentDetailOrder.brand || 'Brand Partner'}
+                      </Text>
                     </View>
                   </View>
                   <NativePressable
@@ -2575,7 +2543,32 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <View style={styles.statementHeroCard}>
                     <View style={styles.sheetProgressTopRow}>
                       <Text style={styles.statementHeroLabel}>BOTTLING PROGRESS</Text>
-                      <Text style={[styles.statementHeroLabel, { color: isCompleted ? '#059669' : '#0F172A', fontWeight: '800' }]}>{progress}%</Text>
+                      <View style={styles.sheetProgressStatusGroup}>
+                        <View
+                          style={[
+                            styles.minimalStatusPill,
+                            isCompleted ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.minimalStatusDot,
+                              isCompleted ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.minimalStatusText,
+                              isCompleted ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
+                            ]}
+                          >
+                            {isCompleted ? 'Completed' : 'In Progress'}
+                          </Text>
+                        </View>
+                        <Text style={[styles.statementHeroLabel, { color: isCompleted ? '#059669' : '#0F172A', fontWeight: '800' }]}>
+                          {progress}%
+                        </Text>
+                      </View>
                     </View>
                     <View style={styles.sheetProgressTrack}>
                       <View style={[styles.sheetProgressFill, { width: `${progress}%` }]} />
@@ -3910,6 +3903,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   statementSheetIconSquircle: {
     width: 36,
@@ -3920,9 +3915,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   statementSheetHeaderTitles: {
     flex: 1,
+    minWidth: 0,
   },
   statementSheetTitle: {
     fontSize: 15,
@@ -3934,6 +3931,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     color: '#64748B',
     marginTop: 1,
+    flexShrink: 1,
   },
   statementModalBody: {
     gap: 10,
@@ -4075,6 +4073,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   // ── Zone Selection List Items ──
@@ -4719,6 +4718,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  sheetProgressStatusGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sheetProgressLabel: {
     fontSize: 11,

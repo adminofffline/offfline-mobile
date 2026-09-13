@@ -391,9 +391,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     [onScan, triggerScanFeedback, flashHud, showScannerToast, isPlant]
   );
 
-  // VisionCamera code scanner (supports 'qr', 'ean-13', 'code-128')
+  // VisionCamera code scanner (strictly 'qr' only to prevent accidental barcode scans)
   const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
+    codeTypes: ['qr'],
     onCodeScanned: (codes) => {
       const now = Date.now();
       if (isProcessingRef.current || (now - lastScanTimestampRef.current < 750)) {

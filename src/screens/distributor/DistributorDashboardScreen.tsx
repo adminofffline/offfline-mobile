@@ -1101,7 +1101,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
         // Single Source of Truth: Check if canonical QR URL was already scanned/delivered
         if (scannedQrUrlsRef.current.has(canonicalUrl)) {
-          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already delivered!`);
           return {
             success: false,
             already_scanned: true,
@@ -1130,8 +1129,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
           if (isRescan) {
             scannedQrUrlsRef.current.add(canonicalUrl);
             setScannedQrUrls(new Set(scannedQrUrlsRef.current));
-            const canId = res.data.can_id || cleanQr;
-            triggerToast(`⚠️ Already Scanned: QR (${canId}) was already delivered!`);
             return res.data;
           }
 
@@ -1175,8 +1172,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
-          // Exactly ONE toast notification for the scan action
-          triggerToast(`✓ Can ${canId} delivered & verified!`);
           return res.data;
         }
         return res.data;
@@ -1188,7 +1183,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
         if (isPlantRequired) {
           const plantMsg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
-          triggerToast(`⚠️ ${plantMsg}`);
           return {
             success: false,
             plant_scan_required: true,
@@ -1209,12 +1203,9 @@ export function DistributorDashboardScreen({ navigation }: any) {
             scannedQrUrlsRef.current.add(canonicalUrl);
             setScannedQrUrls(new Set(scannedQrUrlsRef.current));
           }
-          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already delivered!`);
           return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode, qr_url: canonicalUrl };
         }
 
-        const errMsg = err?.response?.data?.message || 'Delivery scan verification failed';
-        triggerToast(`❌ ${errMsg}`);
         throw err;
       } finally {
         setTimeout(() => {
@@ -1222,7 +1213,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
         }, 1000);
       }
     },
-    [getLocationSnapshot, profileAddress, triggerToast]
+    [getLocationSnapshot, profileAddress]
   );
 
   const handleSimulateBulkDistributor = useCallback(
@@ -1285,15 +1276,11 @@ export function DistributorDashboardScreen({ navigation }: any) {
     [profileAddress]
   );
 
-  const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
+  const handleCompleteScanSession = useCallback((_totalScannedInSession: number) => {
     setShowQrModal(false);
-    // Only trigger batch celebration toast if multiple cans were scanned in this session
-    // (a single scan already surfaced its own dedicated toast)
-    if (totalScannedInSession > 1) {
-      triggerToast(`🎉 Batch of ${totalScannedInSession} deliveries recorded & verified!`);
-    }
+    setToastData(null);
     loadProductionData().catch(() => {});
-  }, [loadProductionData, triggerToast]);
+  }, [loadProductionData]);
 
   // ── Handle Real QR Scan Submission on Production ──
   const handlePerformLiveScan = useCallback(() => {
@@ -1890,7 +1877,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE PRODUCTION SYNC ── */}
       <DashboardQRScannerModal
         visible={showQrModal}
-        onClose={() => setShowQrModal(false)}
+        onClose={() => {
+          setShowQrModal(false);
+          setToastData(null);
+        }}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkDistributor}
@@ -2259,36 +2249,12 @@ export function DistributorDashboardScreen({ navigation }: any) {
                       <BottleBadgeIcon size={18} color="#0F172A" />
                     </View>
                     <View style={styles.statementSheetHeaderTitles}>
-                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1} ellipsizeMode="tail">
                         {currentRecord.can_id}
                       </Text>
-                      <View style={styles.sheetHeaderSubRow}>
-                        <Text style={styles.statementSheetRef} numberOfLines={1}>
-                          {currentRecord.campaign_title || 'General Batch'}
-                        </Text>
-                        <View
-                          style={[
-                            styles.minimalStatusPill,
-                            isDuplicate ? styles.appleDuplicatePill : styles.minimalStatusPillSettled,
-                            { marginLeft: 8 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.minimalStatusDot,
-                              isDuplicate ? styles.duplicateDot : styles.minimalStatusDotSettled,
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.minimalStatusText,
-                              isDuplicate ? styles.appleDuplicateText : styles.minimalStatusTextSettled,
-                            ]}
-                          >
-                            {isDuplicate ? 'Already Scanned' : 'Verified'}
-                          </Text>
-                        </View>
-                      </View>
+                      <Text style={styles.statementSheetRef} numberOfLines={1} ellipsizeMode="tail">
+                        {currentRecord.campaign_title || 'General Batch'}
+                      </Text>
                     </View>
                   </View>
                   <NativePressable
@@ -2326,6 +2292,27 @@ export function DistributorDashboardScreen({ navigation }: any) {
                           {isDuplicate
                             ? `Previously scanned & recorded • ${currentRecord.deliveryTime}`
                             : `Recorded ${currentRecord.deliveryTime}`}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.minimalStatusPill,
+                          isDuplicate ? styles.appleDuplicatePill : styles.minimalStatusPillSettled,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.minimalStatusDot,
+                            isDuplicate ? styles.duplicateDot : styles.minimalStatusDotSettled,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.minimalStatusText,
+                            isDuplicate ? styles.appleDuplicateText : styles.minimalStatusTextSettled,
+                          ]}
+                        >
+                          {isDuplicate ? 'Duplicate' : 'Verified'}
                         </Text>
                       </View>
                     </View>
@@ -3527,6 +3514,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   statementSheetIconSquircle: {
     width: 36,
@@ -3537,9 +3526,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   statementSheetHeaderTitles: {
     flex: 1,
+    minWidth: 0,
   },
   statementSheetTitle: {
     fontSize: 15,
@@ -3551,6 +3542,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     color: '#64748B',
     marginTop: 1,
+    flexShrink: 1,
   },
   statementModalBody: {
     gap: 10,
@@ -3692,6 +3684,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   settleBadgeTextGreen: {
     color: '#047857',
