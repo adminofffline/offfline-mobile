@@ -1442,13 +1442,15 @@ export function PlantDashboardScreen({ navigation }: any) {
           setBottledDispatchedCans(updatedUrls.size);
           setBottlingCommissionTotal(updatedUrls.size * 10.00);
 
+          let matchedOrder = false;
           setOrders((prev) =>
             prev.map((ord) => {
-              const isMatch =
-                ord.id === returnedCampId ||
-                ord.campaign === returnedCampTitle ||
-                (activeCamp && ord.id === activeCamp.id);
-              if (isMatch) {
+              if (matchedOrder) return ord;
+              const isExactId = Boolean(returnedCampId && ord.id === returnedCampId);
+              const isSelected = Boolean(activeCamp && ord.id === activeCamp.id);
+              const isTitleMatch = Boolean(!returnedCampId && ord.campaign === returnedCampTitle);
+              if (isExactId || isSelected || isTitleMatch) {
+                matchedOrder = true;
                 const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
                 return {
                   ...ord,
@@ -1506,7 +1508,7 @@ export function PlantDashboardScreen({ navigation }: any) {
       } finally {
         setTimeout(() => {
           isScanningRef.current = false;
-        }, 300);
+        }, 1000);
       }
     },
     [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, triggerToast]

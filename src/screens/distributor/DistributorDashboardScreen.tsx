@@ -1220,7 +1220,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
       } finally {
         setTimeout(() => {
           isScanningRef.current = false;
-        }, 300);
+        }, 1000);
       }
     },
     [getLocationSnapshot, profileAddress, triggerToast]

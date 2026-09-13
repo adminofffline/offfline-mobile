@@ -141,6 +141,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     canId?: string;
   }>({ status: 'IDLE', message: 'Ready to scan' });
   const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
+  const scanResultDataRef = useRef<ScanResultData | null>(null);
+  const lastScanTimestampRef = useRef<number>(0);
 
   const cameraDevice = useCameraDevice(cameraPosition);
   const recentCodesRef = useRef<Map<string, number>>(new Map());
@@ -270,7 +272,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
               setLastScannedCode(dupCode);
               flashHud('DUPLICATE', `⚠️ Already Scanned: ${dupCode}`, dupCode);
-              setScanResultData({
+              const dupData: ScanResultData = {
                 status: 'DUPLICATE',
                 title: '⚠️ Already Scanned',
                 message: res.message || 'This QR code was already verified and recorded.',
@@ -285,7 +287,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
                 allocatedQuantity: res.allocated_quantity,
                 scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              });
+              };
+              scanResultDataRef.current = dupData;
+              setScanResultData(dupData);
               return;
             }
 
@@ -293,7 +297,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
               setLastScannedCode(cleanCode);
               flashHud('ERROR', res.message || '⚠️ Plant scan pending', cleanCode);
-              setScanResultData({
+              const pendingData: ScanResultData = {
                 status: 'ERROR',
                 title: '⚠️ Plant Scan Pending',
                 message: res.message || 'This QR has not been scanned by the Plant yet.',
@@ -303,7 +307,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
                 brandName: res.brand_name || activeCampaignBrand,
                 scanType: 'DISTRIBUTOR',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              });
+              };
+              scanResultDataRef.current = pendingData;
+              setScanResultData(pendingData);
               return;
             }
 
@@ -314,7 +320,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               const uniqueSessionCount = sessionScannedUrlsRef.current.size;
               triggerScanFeedback(res.can_id || cleanCode, uniqueSessionCount);
               flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
-              setScanResultData({
+              const successData: ScanResultData = {
                 status: 'SUCCESS',
                 title: isPlant ? '✓ Can QR Verified & Bottled' : '✓ Delivery QR Verified',
                 message: res.message || (isPlant ? 'Can verified and bottled successfully.' : 'Can verified and delivered successfully.'),
@@ -331,7 +337,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
                 scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 rawResponse: res,
-              });
+              };
+              scanResultDataRef.current = successData;
+              setScanResultData(successData);
             }
           }
         }
@@ -346,7 +354,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           setLastScannedCode(cleanCode);
           const msg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
           flashHud('ERROR', msg, cleanCode);
-          setScanResultData({
+          const pendingData: ScanResultData = {
             status: 'ERROR',
             title: '⚠️ Plant Scan Pending',
             message: msg,
@@ -354,7 +362,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             canId: cleanCode,
             scanType: 'DISTRIBUTOR',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          });
+          };
+          scanResultDataRef.current = pendingData;
+          setScanResultData(pendingData);
           return;
         }
 
@@ -370,7 +380,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
           setLastScannedCode(cleanCode);
           flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
-          setScanResultData({
+          const dupData: ScanResultData = {
             status: 'DUPLICATE',
             title: '⚠️ Already Scanned',
             message: err?.response?.data?.message || 'This QR has already been verified.',
@@ -378,12 +388,14 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             canId: cleanCode,
             scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          });
+          };
+          scanResultDataRef.current = dupData;
+          setScanResultData(dupData);
         } else {
           ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
           const errMsg = err?.response?.data?.message || err?.message || 'Scan unverified';
           flashHud('ERROR', errMsg, cleanCode);
-          setScanResultData({
+          const errData: ScanResultData = {
             status: 'ERROR',
             title: '❌ Verification Failed',
             message: errMsg,
@@ -391,13 +403,18 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             canId: cleanCode,
             scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          });
+          };
+          scanResultDataRef.current = errData;
+          setScanResultData(errData);
         }
       } finally {
-        // Keep lock for 400ms to guarantee camera frame stabilization
-        setTimeout(() => {
-          isProcessingRef.current = false;
-        }, 400);
+        // If a popup result was rendered, KEEP the lock held!
+        // The lock must strictly remain held until user taps 'Scan Next' or closes the popup.
+        if (!scanResultDataRef.current) {
+          setTimeout(() => {
+            isProcessingRef.current = false;
+          }, 1000);
+        }
       }
     },
     [onScan, triggerScanFeedback, flashHud, activeCampaignTitle, activeCampaignBrand, isPlant]
@@ -407,9 +424,19 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (isProcessingRef.current || scanResultData) return;
+      const now = Date.now();
+      // Atomic lock & debounce:
+      // If currently processing, popup visible, or within 2000ms cooldown: DROP FRAME
+      if (isProcessingRef.current || scanResultDataRef.current != null || (now - lastScanTimestampRef.current < 2000)) {
+        return;
+      }
       const firstVal = codes[0]?.value;
       if (!firstVal) return;
+
+      // Synchronously lock IMMEDIATELY on first frame detection before any async code runs
+      isProcessingRef.current = true;
+      lastScanTimestampRef.current = now;
+
       processCode(firstVal);
     },
   });
@@ -424,13 +451,20 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   }, [sessionCount, onComplete, onClose]);
 
   const handleScanNext = useCallback(() => {
+    // 1. Close popup
+    scanResultDataRef.current = null;
     setScanResultData(null);
+
+    // 2. Enforce 800ms cooldown before camera accepts next scan to let user aim at new can
+    isProcessingRef.current = true;
+    lastScanTimestampRef.current = Date.now();
     setTimeout(() => {
       isProcessingRef.current = false;
-    }, 450);
+    }, 800);
   }, []);
 
   const handlePopupClose = useCallback(() => {
+    scanResultDataRef.current = null;
     setScanResultData(null);
     handleCompleteScanning();
   }, [handleCompleteScanning]);
@@ -584,8 +618,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           <VisionCamera
             style={StyleSheet.absoluteFill}
             device={cameraDevice}
-            isActive={true}
-            codeScanner={codeScanner}
+            isActive={!scanResultData}
+            codeScanner={!scanResultData ? codeScanner : undefined}
             torch={torch && cameraPosition === 'back' ? 'on' : 'off'}
             enableZoomGesture
           />
