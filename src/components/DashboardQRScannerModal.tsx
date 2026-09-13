@@ -66,6 +66,9 @@ export interface DashboardQRScannerModalProps {
     current_count?: number;
     already_scanned?: boolean;
     is_rescan?: boolean;
+    plant_scan_required?: boolean;
+    code?: string;
+    qr_url?: string;
   } | void> | void;
   onSimulateBulk?: (amount: number) => Promise<void> | void;
   onComplete?: (totalScannedInSession: number) => void;
@@ -259,6 +262,13 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               return;
             }
 
+            if (res.plant_scan_required || res.code === 'PLANT_SCAN_REQUIRED') {
+              ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
+              setLastScannedCode(cleanCode);
+              flashHud('ERROR', res.message || '⚠️ Plant scan pending', cleanCode);
+              return;
+            }
+
             if (res.success) {
               sessionScannedUrlsRef.current.add(canonicalUrl);
               sessionScannedCodesRef.current.add(cleanCode);
@@ -270,6 +280,18 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           }
         }
       } catch (err: any) {
+        const isPlantRequired =
+          err?.response?.data?.code === 'PLANT_SCAN_REQUIRED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('plant scan') ||
+          err?.response?.data?.error?.toLowerCase?.()?.includes('plant scan');
+
+        if (isPlantRequired) {
+          ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
+          setLastScannedCode(cleanCode);
+          flashHud('ERROR', err?.response?.data?.message || '⚠️ Plant scan pending', cleanCode);
+          return;
+        }
+
         const isDup =
           err?.response?.status === 409 ||
           err?.response?.data?.already_scanned ||

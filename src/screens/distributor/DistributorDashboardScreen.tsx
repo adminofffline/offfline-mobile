@@ -1183,6 +1183,22 @@ export function DistributorDashboardScreen({ navigation }: any) {
         }
         return res.data;
       } catch (err: any) {
+        const isPlantRequired =
+          err?.response?.data?.code === 'PLANT_SCAN_REQUIRED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('plant scan') ||
+          err?.response?.data?.error?.toLowerCase?.()?.includes('plant scan');
+
+        if (isPlantRequired) {
+          const plantMsg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
+          triggerToast(`⚠️ ${plantMsg}`);
+          return {
+            success: false,
+            plant_scan_required: true,
+            code: 'PLANT_SCAN_REQUIRED',
+            message: plantMsg,
+          };
+        }
+
         const isDup =
           err?.response?.status === 409 ||
           err?.response?.data?.already_scanned ||
