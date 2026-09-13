@@ -1098,7 +1098,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
         const scanPayload = {
           qr_id: cleanQr,
-          campaign_id: 'CMP_LIVE_DIST_1',
           latitude: coords.latitude || 13.0827,
           longitude: coords.longitude || 80.2707,
           accuracy: coords.accuracy || 5.0,
@@ -1865,8 +1864,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkDistributor}
         onPerformLiveScan={handlePerformLiveScan}
-        title="Burst Scanner"
-        activeCampaignTitle="Live Delivery Batch"
+        title="Live Scanner"
+        activeCampaignTitle="All-Batch Can Verification"
         isPlant={false}
       />
 

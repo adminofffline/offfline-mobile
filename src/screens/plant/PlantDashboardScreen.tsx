@@ -1376,9 +1376,8 @@ export function PlantDashboardScreen({ navigation }: any) {
 
         const scanPayload = {
           qr_id: cleanQr,
-          campaign_id: activeCamp?.id || 'CMP_GEN_1',
-          plant_id: activeCamp?.plant_id || (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
-          plant_name: (activeCamp as any)?.plant_name || plantProfileName || currentUser?.fullName || 'Water Plant Facility',
+          plant_id: (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
+          plant_name: plantProfileName || currentUser?.fullName || 'Water Plant Facility',
           location_name: activeCamp?.location || currentLocationDisplay,
           latitude: coords.latitude || 13.0827,
           longitude: coords.longitude || 80.2707,
@@ -1393,34 +1392,40 @@ export function PlantDashboardScreen({ navigation }: any) {
             return res.data;
           }
 
-          const updatedCount = Number(res.data.current_count || (bottledDispatchedCans + 1));
+          const returnedCampId = String(res.data.campaign_id || '');
+          const returnedCampTitle = res.data.campaign_title || activeCamp?.campaign || 'Water Bottling Campaign';
+          const returnedBrand = res.data.brand_name || res.data.brand || activeCamp?.brand || 'Verified Brand';
+          const canIdentifier = res.data.can_id || cleanQr;
+
           setScannerCount((c) => c + 1);
           setBottledDispatchedCans((prev) => prev + 1);
           setBottlingCommissionTotal((prev) => prev + 10.00);
 
-          if (activeCamp) {
-            setOrders((prev) =>
-              prev.map((ord) => {
-                if (ord.id === activeCamp.id) {
-                  const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
-                  return {
-                    ...ord,
-                    bottledNum: nextBottled,
-                    status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
-                  };
-                }
-                return ord;
-              })
-            );
-          }
+          setOrders((prev) =>
+            prev.map((ord) => {
+              const isMatch =
+                ord.id === returnedCampId ||
+                ord.campaign === returnedCampTitle ||
+                (activeCamp && ord.id === activeCamp.id);
+              if (isMatch) {
+                const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
+                return {
+                  ...ord,
+                  bottledNum: nextBottled,
+                  status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
+                };
+              }
+              return ord;
+            })
+          );
 
           // Add to plant production ledger
           const resolvedGps = resolveLocationGps(activeCamp?.location || currentLocationDisplay);
           const todayDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
           const newLedgerItem: SettlementRecord = {
             id: `PLANT-${Date.now().toString().slice(-4)}`,
-            campaignTitle: activeCamp?.campaign || 'Water Bottling Campaign',
-            brandName: activeCamp?.brand || 'Verified Brand',
+            campaignTitle: returnedCampTitle,
+            brandName: returnedBrand,
             bottlesCount: 1,
             commission: 10.00,
             deliveryDate: todayDateStr,
@@ -1432,7 +1437,7 @@ export function PlantDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
-          triggerToast(`✓ Can ${res.data.can_id || cleanQr} verified & bottled!`);
+          triggerToast(`✓ Can ${canIdentifier} verified & bottled! (${returnedBrand})`);
           return res.data;
         }
         return res.data;
@@ -2117,9 +2122,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         activeTab={activeTab}
         onSelectTab={handleTabSelect}
         onPressCenterScan={() => {
-          if (filteredOrders.length > 0) {
-            setSelectedScanCampaign(filteredOrders[0]);
-          }
+          setSelectedScanCampaign(null);
           setShowQrModal(true);
         }}
       />
@@ -2132,9 +2135,9 @@ export function PlantDashboardScreen({ navigation }: any) {
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkPlant}
         onPerformLiveScan={handlePerformLiveScan}
-        title="Burst Scanner"
-        activeCampaignTitle={selectedScanCampaign?.campaign || orders[0]?.campaign}
-        activeCampaignBrand={selectedScanCampaign?.brand || orders[0]?.brand}
+        title="Live Scanner"
+        activeCampaignTitle={selectedScanCampaign ? selectedScanCampaign.campaign : 'All-Batch Can Verification'}
+        activeCampaignBrand={selectedScanCampaign ? selectedScanCampaign.brand : undefined}
         isPlant={true}
       />
 

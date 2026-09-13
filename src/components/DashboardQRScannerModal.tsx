@@ -42,8 +42,9 @@ const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
 
 const formatCampaignTitle = (title?: string) => {
-  if (!title) return 'Commercial Delivery Batch';
+  if (!title) return 'All-Batch Can Verification';
   const clean = String(title).trim();
+  if (clean === 'All-Batch Can Verification' || clean === 'Universal Can Scanner') return 'All-Batch Can Verification';
   if (clean.startsWith('REGRESSION_CAMP_')) {
     const parts = clean.split('_');
     const num = parts[2] || '1';
@@ -82,8 +83,8 @@ export const DashboardQRScannerModal: React.FC<DashboardQRScannerModalProps> = (
   onSimulateBulk,
   onComplete,
   onPerformLiveScan,
-  title = 'Burst Scanner',
-  activeCampaignTitle,
+  title = 'Live Scanner',
+  activeCampaignTitle = 'All-Batch Can Verification',
   activeCampaignBrand,
   isPlant = true,
 }) => {
@@ -110,8 +111,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   onSimulateBulk,
   onComplete,
   onPerformLiveScan,
-  title = 'Burst Scanner',
-  activeCampaignTitle,
+  title = 'Live Scanner',
+  activeCampaignTitle = 'All-Batch Can Verification',
   activeCampaignBrand,
   isPlant,
 }) => {
@@ -468,7 +469,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               </View>
               {formattedTitle ? (
                 <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {formattedTitle} {activeCampaignBrand ? `• ${activeCampaignBrand}` : ''}
+                  {activeCampaignBrand
+                    ? `${formattedTitle} • ${activeCampaignBrand}`
+                    : (formattedTitle || 'All-Batch Can Verification')}
                 </Text>
               ) : null}
             </View>
