@@ -109,3 +109,23 @@ export function extractCleanQrId(raw: string): string {
   return trimmed.split('?')[0].split('#')[0].replace(/^[/#?]+/, '').replace(/[/#?]+$/, '').trim();
 }
 
+/**
+ * Universal canonical QR URL generator.
+ * Single source of truth for can QR representations across all dashboards.
+ * Maps any input (raw ID, partial URL, token, full URL) to the canonical URL format:
+ * https://offfline.in/q/<cleanId>
+ */
+export function toCanonicalQrUrl(raw: string): string {
+  const cleanId = extractCleanQrId(raw);
+  if (!cleanId) return '';
+  return `https://offfline.in/q/${cleanId}`;
+}
+
+/**
+ * Validate that an identifier represents a syntactically valid QR code or URL
+ */
+export function isValidQrId(raw: string): boolean {
+  const cleanId = extractCleanQrId(raw);
+  return typeof cleanId === 'string' && cleanId.length >= 3;
+}
+

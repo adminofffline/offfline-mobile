@@ -36,7 +36,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NativePressable } from './common/NativePressable';
 
-import { extractCleanQrId } from '../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, isValidQrId } from '../utils/locationProfiles';
 
 const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
@@ -131,6 +131,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   const cameraDevice = useCameraDevice(cameraPosition);
   const recentCodesRef = useRef<Map<string, number>>(new Map());
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
+  const sessionScannedUrlsRef = useRef<Set<string>>(new Set());
+  const isProcessingRef = useRef(false);
   const hudTimerRef = useRef<any>(null);
 
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -143,7 +145,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     setHudFeedback({ status, message, canId });
     hudTimerRef.current = setTimeout(() => {
       setHudFeedback({ status: 'IDLE', message: 'Ready to scan' });
-    }, status === 'SUCCESS' ? 1200 : 2000);
+    }, status === 'SUCCESS' ? 1400 : 2200);
   }, []);
 
   // Request camera permission on button press
@@ -180,13 +182,15 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   }, [laserAnim]);
 
   // Trigger pulse animation & transient badge on scan
-  const triggerScanFeedback = useCallback((code: string) => {
+  const triggerScanFeedback = useCallback((code: string, newCount?: number) => {
     ReactNativeHapticFeedback.trigger('impactHeavy', {
       enableVibrateFallback: true,
       ignoreAndroidSystemSettings: false,
     });
 
-    setSessionCount((prev) => prev + 1);
+    if (typeof newCount === 'number') {
+      setSessionCount(newCount);
+    }
     setLastScannedCode(code);
 
     // Pulse animation
@@ -211,17 +215,24 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   // Process a scanned code through extractCleanQrId and onScan
   const processCode = useCallback(
     async (rawVal: string, isManual = false) => {
+      if (!isManual && isProcessingRef.current) {
+        return;
+      }
+
       const cleanCode = extractCleanQrId(rawVal);
       if (!cleanCode || cleanCode.length < 3) return;
+      const canonicalUrl = toCanonicalQrUrl(rawVal);
 
-      // In continuous camera mode, avoid repeat triggers on the exact code already processed in this active session
-      if (!isManual && sessionScannedCodesRef.current.has(cleanCode)) {
+      // In continuous camera mode, avoid repeat triggers on the exact code/URL already processed in this active session
+      if (!isManual && (sessionScannedUrlsRef.current.has(canonicalUrl) || sessionScannedCodesRef.current.has(cleanCode))) {
+        flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
+        setLastScannedCode(cleanCode);
         return;
       }
 
       const now = Date.now();
       const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
-      if (!isManual && now - lastScannedTime < 2200) return;
+      if (!isManual && now - lastScannedTime < 2000) return;
       recentCodesRef.current.set(cleanCode, now);
 
       if (recentCodesRef.current.size > 50) {
@@ -230,6 +241,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         });
       }
 
+      isProcessingRef.current = true;
       try {
         const result = onScan(cleanCode);
         if (result && typeof (result as any).then === 'function') {
@@ -238,29 +250,24 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             const isDup = Boolean(res.already_scanned || res.is_rescan);
             if (isDup) {
               const dupCode = res.can_id || cleanCode;
+              sessionScannedUrlsRef.current.add(canonicalUrl);
               sessionScannedCodesRef.current.add(cleanCode);
+              if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
               ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
               setLastScannedCode(dupCode);
-              badgeAnim.setValue(1);
-              Animated.timing(badgeAnim, {
-                toValue: 0,
-                duration: 2500,
-                delay: 1200,
-                useNativeDriver: true,
-              }).start();
               flashHud('DUPLICATE', `⚠️ Already Scanned: ${dupCode}`, dupCode);
               return;
             }
 
-            sessionScannedCodesRef.current.add(cleanCode);
-            if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
-            triggerScanFeedback(res.can_id || cleanCode);
-            flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
+            if (res.success) {
+              sessionScannedUrlsRef.current.add(canonicalUrl);
+              sessionScannedCodesRef.current.add(cleanCode);
+              if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
+              const uniqueSessionCount = sessionScannedUrlsRef.current.size;
+              triggerScanFeedback(res.can_id || cleanCode, uniqueSessionCount);
+              flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
+            }
           }
-        } else {
-          sessionScannedCodesRef.current.add(cleanCode);
-          triggerScanFeedback(cleanCode);
-          flashHud('SUCCESS', `✓ ${cleanCode} Scanned`, cleanCode);
         }
       } catch (err: any) {
         const isDup =
@@ -270,30 +277,30 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
         if (isDup) {
+          sessionScannedUrlsRef.current.add(canonicalUrl);
           sessionScannedCodesRef.current.add(cleanCode);
           ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
           setLastScannedCode(cleanCode);
-          badgeAnim.setValue(1);
-          Animated.timing(badgeAnim, {
-            toValue: 0,
-            duration: 2500,
-            delay: 1200,
-            useNativeDriver: true,
-          }).start();
           flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
         } else {
           ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
           flashHud('ERROR', err?.response?.data?.message || 'Scan unverified', cleanCode);
         }
+      } finally {
+        // Keep lock for 400ms to guarantee camera frame stabilization
+        setTimeout(() => {
+          isProcessingRef.current = false;
+        }, 400);
       }
     },
     [onScan, triggerScanFeedback, flashHud]
   );
 
-  // VisionCamera code scanner
+  // VisionCamera code scanner (strictly 'qr' codes)
   const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
+    codeTypes: ['qr'],
     onCodeScanned: (codes) => {
+      if (isProcessingRef.current) return;
       const firstVal = codes[0]?.value;
       if (!firstVal) return;
       processCode(firstVal);

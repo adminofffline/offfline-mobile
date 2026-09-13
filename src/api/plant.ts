@@ -42,6 +42,7 @@ export const plantApi = {
 
   scanQr: async (data: {
     qr_id: string;
+    qr_url?: string;
     campaign_id?: string;
     plant_id?: string;
     plant_name?: string;
@@ -52,7 +53,7 @@ export const plantApi = {
     accuracy?: number;
   }) => {
     const res = await api.post('/plant/qr/scan', data);
-    apiCache.invalidate(/plant_requests|plant_stats/);
+    apiCache.invalidate(/plant_requests|plant_stats|public_scan_audit|live_scans/);
     return res;
   },
 

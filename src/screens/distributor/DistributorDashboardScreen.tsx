@@ -60,7 +60,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
 import { distributorApi } from '../../api/distributor';
 import { brandApi } from '../../api/brand';
 import { adminApi } from '../../api/admin';
@@ -808,8 +808,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  // Scanner Simulator Count
+  // Scanner Simulator Count & Single Source of Truth
   const [scannerCount, setScannerCount] = useState(0);
+  const [scannedQrUrls, setScannedQrUrls] = useState<Set<string>>(new Set());
+  const scannedQrUrlsRef = useRef<Set<string>>(new Set());
 
   const triggerToast = useCallback((
     msg: string | ToastData,
@@ -919,6 +921,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
       }
 
       setScans(mappedScans);
+      const initialScannedUrls = new Set<string>();
+      mappedScans.forEach((m) => {
+        const canonical = toCanonicalQrUrl(m.can_id);
+        if (canonical) initialScannedUrls.add(canonical);
+      });
+      setScannedQrUrls(initialScannedUrls);
+      scannedQrUrlsRef.current = initialScannedUrls;
 
       // 2. Map Real Settlements from Production (strictly isolate DISTRIBUTOR role)
       const now = new Date();
@@ -1090,6 +1099,19 @@ export function DistributorDashboardScreen({ navigation }: any) {
       try {
         const cleanQr = extractCleanQrId(scannedCode);
         if (!cleanQr) return;
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
+
+        // Single Source of Truth: Check if canonical QR URL was already scanned/delivered
+        if (scannedQrUrlsRef.current.has(canonicalUrl)) {
+          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already delivered!`);
+          return {
+            success: false,
+            already_scanned: true,
+            is_rescan: true,
+            can_id: cleanQr,
+            qr_url: canonicalUrl,
+          };
+        }
 
         const snapshotLoc = getLocationSnapshot();
         const coords = snapshotLoc
@@ -1098,6 +1120,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
         const scanPayload = {
           qr_id: cleanQr,
+          qr_url: canonicalUrl,
           latitude: coords.latitude || 13.0827,
           longitude: coords.longitude || 80.2707,
           accuracy: coords.accuracy || 5.0,
@@ -1107,21 +1130,17 @@ export function DistributorDashboardScreen({ navigation }: any) {
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
           if (isRescan) {
-            const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
-            const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const dupScan: ScanRecord = {
-              id: res.data.scan_id || `SCN_DUP_${Date.now()}_${Math.random()}`,
-              can_id: canId,
-              campaign_title: res.data.campaign_title || res.data.campaign?.title || 'Live Delivery Batch',
-              location_name: res.data.location_name || 'Chennai Central Hub',
-              deliveryTime: formattedDeliveryTime,
-              payout_amount: 0.00,
-              status: 'ALREADY_SCANNED',
-            };
-            setScans((prev) => [dupScan, ...prev]);
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
+            const canId = res.data.can_id || cleanQr;
             triggerToast(`⚠️ Already Scanned: QR (${canId}) was already delivered!`);
             return res.data;
           }
+
+          // Record new unique QR URL into registry
+          scannedQrUrlsRef.current.add(canonicalUrl);
+          const updatedUrls = new Set(scannedQrUrlsRef.current);
+          setScannedQrUrls(updatedUrls);
 
           const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
           const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1138,7 +1157,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           };
 
           setScans((prev) => [newScan, ...prev]);
-          setScannerCount((c) => c + 1);
+          setScannerCount(updatedUrls.size);
 
           // Add to distributor ledger
           const resolvedGps = resolveLocationGps(profileAddress || 'Chennai Central Hub');
@@ -1158,6 +1177,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
+          // Exactly ONE toast notification for the scan action
           triggerToast(`✓ Can ${canId} delivered & verified!`);
           return res.data;
         }
@@ -1169,31 +1189,26 @@ export function DistributorDashboardScreen({ navigation }: any) {
           err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
         if (isDup) {
-          const canId = scannedCode.startsWith('CAN-') ? scannedCode : `CAN-${scannedCode.slice(-6).toUpperCase()}`;
-          const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const dupScan: ScanRecord = {
-            id: `SCN_DUP_${Date.now()}_${Math.random()}`,
-            can_id: canId,
-            campaign_title: 'Live Delivery Batch',
-            location_name: 'Chennai Central Hub',
-            deliveryTime: formattedDeliveryTime,
-            payout_amount: 0.00,
-            status: 'ALREADY_SCANNED',
-          };
-          setScans((prev) => [dupScan, ...prev]);
+          if (canonicalUrl) {
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
+          }
           triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already delivered!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
+          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode, qr_url: canonicalUrl };
         }
 
         const errMsg = err?.response?.data?.message || 'Delivery scan verification failed';
         triggerToast(`❌ ${errMsg}`);
         throw err;
       } finally {
-        isScanningRef.current = false;
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 300);
       }
     },
-    [getLocationSnapshot, profileAddress]
+    [getLocationSnapshot, profileAddress, triggerToast]
   );
 
   const handleSimulateBulkDistributor = useCallback(
@@ -1258,11 +1273,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
-    if (totalScannedInSession > 0) {
+    // Only trigger batch celebration toast if multiple cans were scanned in this session
+    // (a single scan already surfaced its own dedicated toast)
+    if (totalScannedInSession > 1) {
       triggerToast(`🎉 Batch of ${totalScannedInSession} deliveries recorded & verified!`);
-      loadProductionData().catch(() => {});
     }
-  }, [loadProductionData]);
+    loadProductionData().catch(() => {});
+  }, [loadProductionData, triggerToast]);
 
   // ── Handle Real QR Scan Submission on Production ──
   const handlePerformLiveScan = useCallback(() => {

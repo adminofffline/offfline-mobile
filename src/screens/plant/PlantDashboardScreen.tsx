@@ -57,7 +57,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
 import { plantApi } from '../../api/plant';
 import { brandApi } from '../../api/brand';
 import { adminApi } from '../../api/admin';
@@ -938,6 +938,10 @@ export function PlantDashboardScreen({ navigation }: any) {
   const [bottledDispatchedCans, setBottledDispatchedCans] = useState(0);
   const [bottlingCommissionTotal, setBottlingCommissionTotal] = useState(0);
 
+  // Single Source of Truth for verified scanned can QR URLs
+  const [scannedQrUrls, setScannedQrUrls] = useState<Set<string>>(new Set());
+  const scannedQrUrlsRef = useRef<Set<string>>(new Set());
+
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
   const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
@@ -1050,11 +1054,28 @@ export function PlantDashboardScreen({ navigation }: any) {
         : [];
       const auditScans = scanAuditRes && (scanAuditRes as any).data && Array.isArray((scanAuditRes as any).data.scans) ? (scanAuditRes as any).data.scans : [];
       const liveScans = liveScansRes && (liveScansRes as any).data && Array.isArray((liveScansRes as any).data.scans) ? (liveScansRes as any).data.scans : [];
-      const allScans = [...auditScans, ...liveScans];
+
+      // Single Source of Truth: Deduplicate scans by canonical QR URL
+      const uniqueScansMap = new Map<string, any>();
+      const initialScannedUrls = new Set<string>();
+
+      [...auditScans, ...liveScans].forEach((s: any) => {
+        const rawQr = s.qr_url || s.qr_id || s.can_id || '';
+        const canonicalUrl = toCanonicalQrUrl(rawQr);
+        const dedupeKey = canonicalUrl || s.scan_id || s._id;
+        if (dedupeKey && !uniqueScansMap.has(dedupeKey)) {
+          uniqueScansMap.set(dedupeKey, { ...s, canonical_qr_url: canonicalUrl });
+          if (canonicalUrl) initialScannedUrls.add(canonicalUrl);
+        }
+      });
+
+      const allScans = Array.from(uniqueScansMap.values());
+      setScannedQrUrls(initialScannedUrls);
+      scannedQrUrlsRef.current = initialScannedUrls;
 
       const safeLower = (val: any) => String(val || '').trim().toLowerCase();
 
-      // High performance O(1) scan count indexing (eliminates 2,000,000 array iterations)
+      // High performance O(1) scan count indexing over unique verified scans
       const scanCountsByCampId = new Map<string, number>();
       const scanCountsByTitle = new Map<string, number>();
       for (let i = 0; i < allScans.length; i++) {
@@ -1368,6 +1389,19 @@ export function PlantDashboardScreen({ navigation }: any) {
         const activeCamp = selectedScanCampaign || orders[0];
         const cleanQr = extractCleanQrId(scannedCode);
         if (!cleanQr) return;
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
+
+        // Single Source of Truth: Prevent duplicate counting if canonical QR URL was already scanned
+        if (scannedQrUrlsRef.current.has(canonicalUrl)) {
+          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+          return {
+            success: false,
+            already_scanned: true,
+            is_rescan: true,
+            can_id: cleanQr,
+            qr_url: canonicalUrl,
+          };
+        }
 
         const snapshotLoc = getLocationSnapshot();
         const coords = snapshotLoc
@@ -1376,6 +1410,7 @@ export function PlantDashboardScreen({ navigation }: any) {
 
         const scanPayload = {
           qr_id: cleanQr,
+          qr_url: canonicalUrl,
           plant_id: (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
           plant_name: plantProfileName || currentUser?.fullName || 'Water Plant Facility',
           location_name: activeCamp?.location || currentLocationDisplay,
@@ -1388,18 +1423,25 @@ export function PlantDashboardScreen({ navigation }: any) {
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
           if (isRescan) {
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
             triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already recorded!`);
             return res.data;
           }
+
+          // Record new unique QR URL into registry
+          scannedQrUrlsRef.current.add(canonicalUrl);
+          const updatedUrls = new Set(scannedQrUrlsRef.current);
+          setScannedQrUrls(updatedUrls);
 
           const returnedCampId = String(res.data.campaign_id || '');
           const returnedCampTitle = res.data.campaign_title || activeCamp?.campaign || 'Water Bottling Campaign';
           const returnedBrand = res.data.brand_name || res.data.brand || activeCamp?.brand || 'Verified Brand';
           const canIdentifier = res.data.can_id || cleanQr;
 
-          setScannerCount((c) => c + 1);
-          setBottledDispatchedCans((prev) => prev + 1);
-          setBottlingCommissionTotal((prev) => prev + 10.00);
+          // Recalculate scanned cans directly from single source of truth
+          setBottledDispatchedCans(updatedUrls.size);
+          setBottlingCommissionTotal(updatedUrls.size * 10.00);
 
           setOrders((prev) =>
             prev.map((ord) => {
@@ -1437,6 +1479,7 @@ export function PlantDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
+          // Exactly ONE toast notification for the scan action
           triggerToast(`✓ Can ${canIdentifier} verified & bottled! (${returnedBrand})`);
           return res.data;
         }
@@ -1448,19 +1491,26 @@ export function PlantDashboardScreen({ navigation }: any) {
           err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
         if (isDup) {
+          if (canonicalUrl) {
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
+          }
           triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already recorded!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
+          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode, qr_url: canonicalUrl };
         }
 
         const errMsg = err?.response?.data?.message || 'Scan verification failed';
         triggerToast(`❌ ${errMsg}`);
         throw err;
       } finally {
-        isScanningRef.current = false;
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 300);
       }
     },
-    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, bottledDispatchedCans]
+    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, triggerToast]
   );
 
   const handleSimulateBulkPlant = useCallback(
@@ -1534,11 +1584,13 @@ export function PlantDashboardScreen({ navigation }: any) {
 
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
-    if (totalScannedInSession > 0) {
+    // Only trigger batch celebration toast if multiple cans were scanned in this session
+    // (a single scan already surfaced its own dedicated toast)
+    if (totalScannedInSession > 1) {
       triggerToast(`🎉 Batch of ${totalScannedInSession} cans recorded & verified!`);
-      loadProductionData().catch(() => {});
     }
-  }, [loadProductionData]);
+    loadProductionData().catch(() => {});
+  }, [loadProductionData, triggerToast]);
 
   // ── Live QR Scan Execution on Production Server (Instant 0ms) ──
   const handlePerformLiveScan = useCallback(() => {
