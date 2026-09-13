@@ -65,7 +65,6 @@ import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
 import { apiCache } from '../../api/cache';
-import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
 import { PoppedBottomSheetModal } from '../../components/PoppedBottomSheetModal';
 import { NativePressable } from '../../components/common/NativePressable';

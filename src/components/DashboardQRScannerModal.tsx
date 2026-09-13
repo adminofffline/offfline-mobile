@@ -37,7 +37,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NativePressable } from './common/NativePressable';
 
 import { extractCleanQrId, toCanonicalQrUrl, isValidQrId } from '../utils/locationProfiles';
-import { ScanResultModal, ScanResultData } from './ScanResultModal';
+import { AppleCelebrationToast, ToastData } from './common/AppleCelebrationToast';
 
 const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
@@ -140,8 +140,17 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     message: string;
     canId?: string;
   }>({ status: 'IDLE', message: 'Ready to scan' });
-  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
-  const scanResultDataRef = useRef<ScanResultData | null>(null);
+  const [scannerToast, setScannerToast] = useState<string | ToastData | null>(null);
+  const toastTimeoutRef = useRef<any>(null);
+
+  const showScannerToast = useCallback((toast: string | ToastData) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setScannerToast(toast);
+    toastTimeoutRef.current = setTimeout(() => {
+      setScannerToast(null);
+    }, 2800);
+  }, []);
+
   const lastScanTimestampRef = useRef<number>(0);
 
   const cameraDevice = useCameraDevice(cameraPosition);
@@ -245,19 +254,11 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
         setLastScannedCode(cleanCode);
         flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
-        const dupData: ScanResultData = {
-          status: 'DUPLICATE',
+        showScannerToast({
           title: '⚠️ Already Scanned',
-          message: 'This QR code was already verified and recorded in this session.',
-          qrId: cleanCode,
-          canId: cleanCode,
-          campaignTitle: formatCampaignTitle(activeCampaignTitle),
-          brandName: activeCampaignBrand,
-          scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        scanResultDataRef.current = dupData;
-        setScanResultData(dupData);
+          subtitle: `QR (${cleanCode}) was already recorded in this session.`,
+          isCelebration: false,
+        });
         return;
       }
 
@@ -289,24 +290,11 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
               setLastScannedCode(dupCode);
               flashHud('DUPLICATE', `⚠️ Already Scanned: ${dupCode}`, dupCode);
-              const dupData: ScanResultData = {
-                status: 'DUPLICATE',
+              showScannerToast({
                 title: '⚠️ Already Scanned',
-                message: res.message || 'This QR code was already verified and recorded.',
-                qrId: cleanCode,
-                canId: dupCode,
-                campaignTitle: res.campaign_title || formatCampaignTitle(activeCampaignTitle),
-                brandName: res.brand_name || activeCampaignBrand,
-                plantName: res.plant_name,
-                distributorName: res.distributor_name,
-                locationName: res.location_name,
-                currentCount: res.current_count,
-                allocatedQuantity: res.allocated_quantity,
-                scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              };
-              scanResultDataRef.current = dupData;
-              setScanResultData(dupData);
+                subtitle: res.message || `QR (${dupCode}) was already recorded!`,
+                isCelebration: false,
+              });
               return;
             }
 
@@ -314,19 +302,11 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
               setLastScannedCode(cleanCode);
               flashHud('ERROR', res.message || '⚠️ Plant scan pending', cleanCode);
-              const pendingData: ScanResultData = {
-                status: 'ERROR',
+              showScannerToast({
                 title: '⚠️ Plant Scan Pending',
-                message: res.message || 'This QR has not been scanned by the Plant yet.',
-                qrId: cleanCode,
-                canId: res.can_id || cleanCode,
-                campaignTitle: res.campaign_title || formatCampaignTitle(activeCampaignTitle),
-                brandName: res.brand_name || activeCampaignBrand,
-                scanType: 'DISTRIBUTOR',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              };
-              scanResultDataRef.current = pendingData;
-              setScanResultData(pendingData);
+                subtitle: 'This QR has not been scanned by the Plant yet.',
+                isCelebration: false,
+              });
               return;
             }
 
@@ -336,42 +316,23 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
               const uniqueSessionCount = sessionScannedUrlsRef.current.size;
               triggerScanFeedback(res.can_id || cleanCode, uniqueSessionCount);
-              flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
-              const successData: ScanResultData = {
-                status: 'SUCCESS',
-                title: isPlant ? '✓ Can QR Verified & Bottled' : '✓ Delivery QR Verified',
-                message: res.message || (isPlant ? 'Can verified and bottled successfully.' : 'Can verified and delivered successfully.'),
-                qrId: cleanCode,
-                canId: res.can_id || cleanCode,
-                campaignTitle: res.campaign_title || formatCampaignTitle(activeCampaignTitle),
-                brandName: res.brand_name || activeCampaignBrand,
-                plantName: res.plant_name,
-                distributorName: res.distributor_name,
-                locationName: res.location_name,
-                payoutAmount: Number(res.rate_per_unit || 10.00),
-                currentCount: res.current_count,
-                allocatedQuantity: res.allocated_quantity,
-                scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                rawResponse: res,
-              };
-              scanResultDataRef.current = successData;
-              setScanResultData(successData);
+              const canIdentifier = res.can_id || cleanCode;
+              flashHud('SUCCESS', `✓ Can ${canIdentifier} Verified`, canIdentifier);
+              showScannerToast({
+                title: `✓ Can ${canIdentifier} ${isPlant ? 'Verified & Bottled' : 'Delivered & Verified'}`,
+                subtitle: res.brand_name || res.campaign_title || 'Batch verified',
+                highlight: '+1 Can',
+                isCelebration: true,
+              });
             } else {
               ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
               const errMsg = res.message || 'Verification failed';
               flashHud('ERROR', errMsg, cleanCode);
-              const errData: ScanResultData = {
-                status: 'ERROR',
+              showScannerToast({
                 title: '❌ Verification Failed',
-                message: errMsg,
-                qrId: cleanCode,
-                canId: res.can_id || cleanCode,
-                scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              };
-              scanResultDataRef.current = errData;
-              setScanResultData(errData);
+                subtitle: errMsg,
+                isCelebration: false,
+              });
             }
           }
         }
@@ -386,17 +347,11 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           setLastScannedCode(cleanCode);
           const msg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
           flashHud('ERROR', msg, cleanCode);
-          const pendingData: ScanResultData = {
-            status: 'ERROR',
+          showScannerToast({
             title: '⚠️ Plant Scan Pending',
-            message: msg,
-            qrId: cleanCode,
-            canId: cleanCode,
-            scanType: 'DISTRIBUTOR',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          scanResultDataRef.current = pendingData;
-          setScanResultData(pendingData);
+            subtitle: 'This QR has not been scanned by the Plant yet.',
+            isCelebration: false,
+          });
           return;
         }
 
@@ -412,44 +367,28 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
           setLastScannedCode(cleanCode);
           flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
-          const dupData: ScanResultData = {
-            status: 'DUPLICATE',
+          showScannerToast({
             title: '⚠️ Already Scanned',
-            message: err?.response?.data?.message || 'This QR has already been verified.',
-            qrId: cleanCode,
-            canId: cleanCode,
-            scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          scanResultDataRef.current = dupData;
-          setScanResultData(dupData);
+            subtitle: err?.response?.data?.message || `QR (${cleanCode}) was already recorded!`,
+            isCelebration: false,
+          });
         } else {
           ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
           const errMsg = err?.response?.data?.message || err?.message || 'Scan unverified';
           flashHud('ERROR', errMsg, cleanCode);
-          const errData: ScanResultData = {
-            status: 'ERROR',
+          showScannerToast({
             title: '❌ Verification Failed',
-            message: errMsg,
-            qrId: cleanCode,
-            canId: cleanCode,
-            scanType: isPlant ? 'PLANT' : 'DISTRIBUTOR',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          scanResultDataRef.current = errData;
-          setScanResultData(errData);
+            subtitle: errMsg,
+            isCelebration: false,
+          });
         }
       } finally {
-        // If a popup result was rendered, KEEP the lock held!
-        // The lock must strictly remain held until user taps 'Scan Next' or closes the popup.
-        if (!scanResultDataRef.current) {
-          setTimeout(() => {
-            isProcessingRef.current = false;
-          }, 1000);
-        }
+        setTimeout(() => {
+          isProcessingRef.current = false;
+        }, 750);
       }
     },
-    [onScan, triggerScanFeedback, flashHud, activeCampaignTitle, activeCampaignBrand, isPlant]
+    [onScan, triggerScanFeedback, flashHud, showScannerToast, isPlant]
   );
 
   // VisionCamera code scanner (supports 'qr', 'ean-13', 'code-128')
@@ -457,9 +396,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     codeTypes: ['qr', 'ean-13', 'code-128'],
     onCodeScanned: (codes) => {
       const now = Date.now();
-      // Atomic lock & debounce:
-      // If currently processing, popup visible, or within 1500ms cooldown: DROP FRAME
-      if (isProcessingRef.current || scanResultDataRef.current != null || (now - lastScanTimestampRef.current < 1500)) {
+      if (isProcessingRef.current || (now - lastScanTimestampRef.current < 750)) {
         return;
       }
       const firstVal = codes[0]?.value;
@@ -478,25 +415,6 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
       onClose();
     }
   }, [sessionCount, onComplete, onClose]);
-
-  const handleScanNext = useCallback(() => {
-    // 1. Close popup
-    scanResultDataRef.current = null;
-    setScanResultData(null);
-
-    // 2. Enforce 800ms cooldown before camera accepts next scan to let user aim at new can
-    isProcessingRef.current = true;
-    lastScanTimestampRef.current = Date.now();
-    setTimeout(() => {
-      isProcessingRef.current = false;
-    }, 800);
-  }, []);
-
-  const handlePopupClose = useCallback(() => {
-    scanResultDataRef.current = null;
-    setScanResultData(null);
-    handleCompleteScanning();
-  }, [handleCompleteScanning]);
 
   const handleSwitchCamera = useCallback(() => {
     ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
@@ -869,13 +787,10 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           </View>
         </SafeAreaView>
 
-        {/* ── Scan Result Output Popup Modal (One QR - One Pop up - One Count) ── */}
-        <ScanResultModal
-          visible={!!scanResultData}
-          data={scanResultData}
-          onScanNext={handleScanNext}
-          onClose={handlePopupClose}
-          useNativeModal={false}
+        {/* ── Single Toast Notification for Scan Action (Apple Pill Design) ── */}
+        <AppleCelebrationToast
+          data={scannerToast}
+          onDismiss={() => setScannerToast(null)}
         />
       </View>
     </Modal>
