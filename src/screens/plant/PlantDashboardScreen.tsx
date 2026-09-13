@@ -944,7 +944,6 @@ export function PlantDashboardScreen({ navigation }: any) {
 
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
-  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -2191,17 +2190,6 @@ export function PlantDashboardScreen({ navigation }: any) {
         activeCampaignTitle={selectedScanCampaign ? selectedScanCampaign.campaign : 'All-Batch Can Verification'}
         activeCampaignBrand={selectedScanCampaign ? selectedScanCampaign.brand : undefined}
         isPlant={true}
-      />
-
-      {/* ── Scan Result Output Popup Modal ── */}
-      <ScanResultModal
-        visible={!!scanResultData}
-        data={scanResultData}
-        onScanNext={() => setScanResultData(null)}
-        onClose={() => {
-          setScanResultData(null);
-          setShowQrModal(false);
-        }}
       />
 
       {/* ── MODAL 2: LOCATION PICKER (Apple Themed Redesign) ── */}

@@ -776,7 +776,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
-  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1900,17 +1899,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
         title="Live Scanner"
         activeCampaignTitle="All-Batch Can Verification"
         isPlant={false}
-      />
-
-      {/* ── Scan Result Output Popup Modal ── */}
-      <ScanResultModal
-        visible={!!scanResultData}
-        data={scanResultData}
-        onScanNext={() => setScanResultData(null)}
-        onClose={() => {
-          setScanResultData(null);
-          setShowQrModal(false);
-        }}
       />
 
       {/* ── MODAL 2: EDIT DISTRIBUTOR PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
