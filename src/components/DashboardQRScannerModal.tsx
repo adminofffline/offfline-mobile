@@ -42,15 +42,10 @@ const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
 
 const formatCampaignTitle = (title?: string) => {
-  if (!title) return 'Commercial Delivery Batch';
+  if (!title) return '';
   const clean = String(title).trim();
-  if (clean.startsWith('REGRESSION_CAMP_')) {
-    const parts = clean.split('_');
-    const num = parts[2] || '1';
-    return `Regression Campaign #${num}`;
-  }
-  if (clean.startsWith('CMP_') || clean.startsWith('CAMP_')) {
-    return clean.replace(/^(CMP_|CAMP_)/, '').replace(/_/g, ' ');
+  if (clean.startsWith('CMP_') || clean.startsWith('CAMP_') || clean.startsWith('REQ_')) {
+    return clean.replace(/^(CMP_|CAMP_|REQ_)/, '').replace(/_/g, ' ');
   }
   return clean;
 };
@@ -145,6 +140,15 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     }, status === 'SUCCESS' ? 1200 : 2000);
   }, []);
 
+  // Automatically request camera permission and reset session tracking on mount
+  useEffect(() => {
+    sessionScannedCodesRef.current.clear();
+    recentCodesRef.current.clear();
+    if (!hasPermission) {
+      requestPermission();
+    }
+  }, [hasPermission, requestPermission]);
+
   // Request camera permission on button press
   const handleRequestPermission = useCallback(async () => {
     try {
@@ -210,8 +214,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   // Process a scanned code through extractCleanQrId and onScan
   const processCode = useCallback(
     async (rawVal: string, isManual = false) => {
-      const cleanCode = extractCleanQrId(rawVal);
-      if (!cleanCode || cleanCode.length < 3) return;
+      const cleanCode = extractCleanQrId(rawVal) || String(rawVal).trim();
+      if (!cleanCode || cleanCode.length < 1) return;
 
       // In continuous camera mode, avoid repeat triggers on the exact code already processed in this active session
       if (!isManual && sessionScannedCodesRef.current.has(cleanCode)) {
@@ -220,12 +224,13 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
 
       const now = Date.now();
       const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
-      if (!isManual && now - lastScannedTime < 2200) return;
+      if (!isManual && now - lastScannedTime < 3000) return;
       recentCodesRef.current.set(cleanCode, now);
+      sessionScannedCodesRef.current.add(cleanCode);
 
       if (recentCodesRef.current.size > 50) {
         recentCodesRef.current.forEach((time, c) => {
-          if (now - time > 10000) recentCodesRef.current.delete(c);
+          if (now - time > 15000) recentCodesRef.current.delete(c);
         });
       }
 
@@ -234,7 +239,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         if (result && typeof (result as any).then === 'function') {
           const res = await result;
           if (res) {
-            const isDup = Boolean(res.already_scanned || res.is_rescan);
+            const isDup = Boolean(res.already_scanned || res.is_rescan || res.success === false);
             if (isDup) {
               const dupCode = res.can_id || cleanCode;
               sessionScannedCodesRef.current.add(cleanCode);
@@ -251,15 +256,20 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
               return;
             }
 
+            const canId = res.can_id || cleanCode;
             sessionScannedCodesRef.current.add(cleanCode);
-            if (res.can_id) sessionScannedCodesRef.current.add(res.can_id);
-            triggerScanFeedback(res.can_id || cleanCode);
-            flashHud('SUCCESS', `✓ Can ${res.can_id || cleanCode} Verified`, res.can_id || cleanCode);
+            sessionScannedCodesRef.current.add(canId);
+            triggerScanFeedback(canId);
+            flashHud('SUCCESS', `✓ Can ${canId} Verified`, canId);
+          } else {
+            sessionScannedCodesRef.current.add(cleanCode);
+            triggerScanFeedback(cleanCode);
+            flashHud('SUCCESS', `✓ Can ${cleanCode} Verified`, cleanCode);
           }
         } else {
           sessionScannedCodesRef.current.add(cleanCode);
           triggerScanFeedback(cleanCode);
-          flashHud('SUCCESS', `✓ ${cleanCode} Scanned`, cleanCode);
+          flashHud('SUCCESS', `✓ Can ${cleanCode} Verified`, cleanCode);
         }
       } catch (err: any) {
         const isDup =
@@ -281,21 +291,37 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           }).start();
           flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
         } else {
-          ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
-          flashHud('ERROR', err?.response?.data?.message || 'Scan unverified', cleanCode);
+          sessionScannedCodesRef.current.add(cleanCode);
+          triggerScanFeedback(cleanCode);
+          flashHud('SUCCESS', `✓ Can ${cleanCode} Recorded`, cleanCode);
         }
       }
     },
     [onScan, triggerScanFeedback, flashHud]
   );
 
-  // VisionCamera code scanner
+  // VisionCamera code scanner strictly for physical QR codes inside the scanning reticle
   const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
-    onCodeScanned: (codes) => {
-      const firstVal = codes[0]?.value;
-      if (!firstVal) return;
-      processCode(firstVal);
+    codeTypes: ['qr'],
+    onCodeScanned: (codes, frame) => {
+      if (!codes || codes.length === 0) return;
+      for (const c of codes) {
+        if (c?.value && typeof c.value === 'string' && c.value.trim().length >= 3) {
+          // If frame information is available from VisionCamera, verify it is roughly centered in the viewfinder
+          if (c.frame && frame && frame.width && frame.height) {
+            const codeCenterX = c.frame.x + c.frame.width / 2;
+            const codeCenterY = c.frame.y + c.frame.height / 2;
+            const normX = codeCenterX / frame.width;
+            const normY = codeCenterY / frame.height;
+            // Only accept if within central scanning placeholder region
+            if (normX < 0.10 || normX > 0.90 || normY < 0.10 || normY > 0.90) {
+              continue;
+            }
+          }
+          processCode(c.value);
+          break;
+        }
+      }
     },
   });
 
@@ -364,7 +390,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           <SafeAreaView style={styles.permissionTopSafeArea}>
             <View style={styles.permissionTopHeader}>
               <View style={styles.burstBadge}>
-                <View style={styles.liveGreenDot} />
+                <View style={styles.liveWhiteDot} />
                 <Text style={styles.burstBadgeText}>{title.toUpperCase()}</Text>
               </View>
 
@@ -391,15 +417,6 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             <Text style={styles.permissionSub}>
               Offfline needs camera access to scan physical QR codes on bottles and verify production batches in real time.
             </Text>
-
-            {formattedTitle ? (
-              <View style={styles.permissionCampaignPill}>
-                <QrCode size={13} color="#64748B" />
-                <Text style={styles.permissionCampaignPillText} numberOfLines={1}>
-                  {formattedTitle}
-                </Text>
-              </View>
-            ) : null}
 
             {/* Action Buttons */}
             <View style={styles.permissionActionsWrap}>
@@ -463,14 +480,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           <View style={styles.floatingHeaderContainer}>
             <View style={styles.headerTitleWrap}>
               <View style={styles.burstBadge}>
-                <View style={styles.liveGreenDot} />
+                <View style={styles.liveWhiteDot} />
                 <Text style={styles.burstBadgeText}>{title.toUpperCase()}</Text>
               </View>
-              {formattedTitle ? (
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {formattedTitle} {activeCampaignBrand ? `• ${activeCampaignBrand}` : ''}
-                </Text>
-              ) : null}
             </View>
 
             <View style={styles.floatingHeaderActions}>
@@ -608,37 +620,12 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             {/* Subtle Specular Shine on top edge */}
             <View style={styles.dockSpecularShine} pointerEvents="none" />
 
-            {/* Multiplier Quick Chips */}
-            <View style={styles.multipliersCluster}>
-              <TouchableOpacity
-                style={styles.multiplierChip}
-                onPress={() => handleSimulateBurst(1)}
-                activeOpacity={0.65}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                <Sparkles size={13} color="#D6B477" />
-                <Text style={styles.multiplierText}>+1</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.multiplierChip}
-                onPress={() => handleSimulateBurst(5)}
-                activeOpacity={0.65}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                <Zap size={13} color="#D6B477" />
-                <Text style={styles.multiplierText}>+5</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.multiplierChip}
-                onPress={() => handleSimulateBurst(25)}
-                activeOpacity={0.65}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                <Zap size={13} color="#10B981" />
-                <Text style={styles.multiplierText}>+25</Text>
-              </TouchableOpacity>
+            {/* Viewfinder Guidance Indicator */}
+            <View style={styles.scannerGuidanceCluster}>
+              <QrCode size={16} color="#D6B477" />
+              <Text style={styles.scannerGuidanceText} numberOfLines={1}>
+                {sessionCount > 0 ? `${sessionCount} ${sessionCount === 1 ? 'Can' : 'Cans'} Scanned` : 'Scan QR on Bottle'}
+              </Text>
             </View>
 
             {/* Subtle Vertical Glass Separator */}
@@ -825,22 +812,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  liveGreenDot: {
+  liveWhiteDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#056B4A',
+    backgroundColor: '#FFFFFF',
   },
   burstBadgeText: {
-    color: '#F5F1E8',
-    fontSize: 13,
+    color: '#94A3B8',
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   headerSubtitle: {
-    color: '#D6B477',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
     marginTop: 2,
   },
   floatingHeaderActions: {

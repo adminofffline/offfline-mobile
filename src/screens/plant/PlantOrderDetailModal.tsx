@@ -32,15 +32,10 @@ interface PlantOrderDetailModalProps {
 }
 
 const formatCampaignTitle = (title: string) => {
-  if (!title) return 'Commercial Bottling Order';
+  if (!title) return '';
   const clean = String(title).trim();
-  if (clean.startsWith('REGRESSION_CAMP_')) {
-    const parts = clean.split('_');
-    const num = parts[2] || '1';
-    return `Regression Campaign #${num}`;
-  }
-  if (clean.startsWith('CMP_')) {
-    return clean.replace(/^CMP_/, '').replace(/_/g, ' ');
+  if (clean.startsWith('CMP_') || clean.startsWith('CAMP_') || clean.startsWith('REQ_')) {
+    return clean.replace(/^(CMP_|CAMP_|REQ_)/, '').replace(/_/g, ' ');
   }
   return clean;
 };

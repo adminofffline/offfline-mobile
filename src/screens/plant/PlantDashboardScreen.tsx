@@ -159,29 +159,10 @@ const RupeeBadgeIcon = ({ size = 20, color = '#7C3AED' }: { size?: number; color
 );
 
 const formatCampaignTitle = (title: string) => {
-  if (!title) return 'Commercial Bottling Order';
+  if (!title) return '';
   const clean = String(title).trim();
-  if (/^REGRESSION_CAMP_\d+/i.test(clean)) {
-    const num = clean.match(/\d+/)?.[0] || '1';
-    return `Corporate Hydration Batch #${num}`;
-  }
-  if (/^CSV QR Verification/i.test(clean)) {
-    return 'Retail Store Supply Batch';
-  }
-  if (/^Multi-QR Independent/i.test(clean)) {
-    return 'Bulk Commercial Bottling';
-  }
-  if (clean.toLowerCase() === 'check') {
-    return 'Metro Spring Pure Batch';
-  }
-  if (clean.toLowerCase() === 'muthu priya') {
-    return 'Muthu Priya Corporate Hydration';
-  }
-  if (/^simulation clock test/i.test(clean)) {
-    return 'Express Hydration Line Run';
-  }
-  if (clean.startsWith('CMP_')) {
-    return clean.replace(/^CMP_/, '').replace(/_/g, ' ');
+  if (clean.startsWith('CMP_') || clean.startsWith('CAMP_') || clean.startsWith('REQ_')) {
+    return clean.replace(/^(CMP_|CAMP_|REQ_)/, '').replace(/_/g, ' ');
   }
   return clean;
 };
@@ -465,6 +446,7 @@ interface BottlingOrder {
 
 interface SettlementRecord {
   id: string;
+  campaignId?: string;
   campaignTitle: string;
   brandName: string;
   bottlesCount: number;
@@ -475,6 +457,26 @@ interface SettlementRecord {
   gpsCoords?: string;
   ipAddress?: string;
   settlementStatus: 'SETTLED' | 'PROCESSING' | 'PENDING';
+}
+
+function formatDynamicScanTime(rawDate?: string | number | Date): string {
+  if (!rawDate) return 'Just now';
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return 'Just now';
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  if (diffMs >= 0 && diffMs < 60 * 1000) {
+    return 'Just now';
+  }
+  if (diffMs >= 60 * 1000 && diffMs < 60 * 60 * 1000) {
+    const mins = Math.floor(diffMs / (60 * 1000));
+    return `${mins}m ago`;
+  }
+  const isToday = new Date().toDateString() === d.toDateString();
+  if (isToday) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 const CHENNAI_ZONES = [
@@ -895,6 +897,7 @@ export function PlantDashboardScreen({ navigation }: any) {
   const { getLocationSnapshot } = useLocation();
   const currentUser = user;
   const isScanningRef = useRef(false);
+  const scannedQrSetRef = useRef<Set<string>>(new Set());
 
   const [activeTab, setActiveTab] = useState<'work-orders' | 'settlement-report'>('work-orders');
 
@@ -923,6 +926,7 @@ export function PlantDashboardScreen({ navigation }: any) {
   // Data
   const [orders, setOrders] = useState<BottlingOrder[]>([]);
   const [ledgerRecords, setLedgerRecords] = useState<SettlementRecord[]>([]);
+  const [campaignsLookup, setCampaignsLookup] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toastData, setToastData] = useState<ToastData | string | null>(null);
@@ -1015,16 +1019,10 @@ export function PlantDashboardScreen({ navigation }: any) {
   // ── Load Real Production Data with 0ms Memory Cache & Stale-While-Revalidate ──
   const loadProductionData = useCallback(async (forceRefresh = false) => {
     try {
-      const [plantRes, brandRes, adminRes, scanAuditRes, settRes, liveScansRes, profileRes] = await Promise.all([
-        plantApi.getRequests(forceRefresh).catch(() => null),
-        brandApi.getCampaigns(forceRefresh).catch(() => null),
-        adminApi.getCampaigns(forceRefresh).catch(() => null),
-        apiCache.fetchWithCache('public_scan_audit', () => api.get('/public/scan-audit'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
-        plantApi.getSettlements(undefined, forceRefresh)
-          .then((res: any) => (res?.data?.settlements?.length ? res : paymentsApi.getPlantSettlements({}, forceRefresh).catch(() => res)))
-          .catch(() => paymentsApi.getPlantSettlements({}, forceRefresh).catch(() => null)),
-        apiCache.fetchWithCache('live_scans', () => api.get('/scans'), { forceRefresh, ttlMs: 15000 }).catch(() => null),
-        plantApi.getProfile(undefined, forceRefresh).catch(() => null),
+      const [scanAuditRes, plantRes, profileRes] = await Promise.all([
+        api.get('/public/scan-audit?limit=50').catch(() => null),
+        plantApi.getRequests(true).catch(() => null),
+        plantApi.getProfile(undefined, true).catch(() => null),
       ]);
 
       if (profileRes?.data?.plant) {
@@ -1038,23 +1036,14 @@ export function PlantDashboardScreen({ navigation }: any) {
       }
 
       const plantRequests = plantRes && (plantRes as any).data && Array.isArray((plantRes as any).data.requests) ? (plantRes as any).data.requests : [];
-      const brandCampaigns = brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data.campaigns)
-        ? (brandRes as any).data.campaigns
-        : brandRes && (brandRes as any).data && Array.isArray((brandRes as any).data)
-        ? (brandRes as any).data
-        : [];
-      const adminCampaigns = adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data.campaigns)
-        ? (adminRes as any).data.campaigns
-        : adminRes && (adminRes as any).data && Array.isArray((adminRes as any).data)
-        ? (adminRes as any).data
-        : [];
       const auditScans = scanAuditRes && (scanAuditRes as any).data && Array.isArray((scanAuditRes as any).data.scans) ? (scanAuditRes as any).data.scans : [];
-      const liveScans = liveScansRes && (liveScansRes as any).data && Array.isArray((liveScansRes as any).data.scans) ? (liveScansRes as any).data.scans : [];
-      const allScans = [...auditScans, ...liveScans];
+      const auditCampaigns = scanAuditRes && (scanAuditRes as any).data && Array.isArray((scanAuditRes as any).data.campaigns) ? (scanAuditRes as any).data.campaigns : [];
+      const allScans = auditScans;
+      const allCampaignsList = auditCampaigns;
 
       const safeLower = (val: any) => String(val || '').trim().toLowerCase();
 
-      // High performance O(1) scan count indexing (eliminates 2,000,000 array iterations)
+      // High performance O(1) scan count indexing
       const scanCountsByCampId = new Map<string, number>();
       const scanCountsByTitle = new Map<string, number>();
       for (let i = 0; i < allScans.length; i++) {
@@ -1069,15 +1058,41 @@ export function PlantDashboardScreen({ navigation }: any) {
         }
       }
 
+      const isDemoCampaign = (title?: string, brand?: string, id?: string) => {
+        const t = String(title || '').toLowerCase().trim();
+        const b = String(brand || '').toLowerCase().trim();
+        const i = String(id || '').toLowerCase().trim();
+        return (
+          t.includes('summer hydration') ||
+          t.includes('promo 2026') ||
+          t.includes('regression_camp') ||
+          t.includes('qr_test') ||
+          t.startsWith('qr_') ||
+          t.startsWith('test_') ||
+          t.includes('benchmark') ||
+          t.includes('simulation clock') ||
+          t.includes('test fix') ||
+          t.includes('test brand') ||
+          b.includes('acme global') ||
+          b.includes('acme') ||
+          i.includes('qr_test') ||
+          i.includes('test_') ||
+          i === '6aa6fcb256974a034a9deefd'
+        );
+      };
+
       const mappedOrders: BottlingOrder[] = [];
       const seenIds = new Set<string>();
       const seenTitles = new Set<string>();
 
       // 1. Map all requests from production database
       plantRequests.forEach((req: any) => {
-        const totalTarget = Number(req.target_quantity || req.target_sticker_count || req.quantity || 4000);
+        const reqTitle = String(req.campaign_name || req.campaignName || req.campaign_title || req.title || req.name || req.campaign || req.id || '');
+        const reqBrand = String(req.brand_name || req.brandName || 'Brand Partner');
         const reqId = String(req.id || req._id || req.campaign_id || `REQ_${Math.random()}`);
-        const reqTitle = String(req.campaign_name || req.campaignName || req.title || 'Water Bottling Batch');
+        if (isDemoCampaign(reqTitle, reqBrand, reqId)) return;
+
+        const totalTarget = Number(req.target_quantity || req.target_sticker_count || req.quantity || 4000);
         const lowTitle = safeLower(reqTitle);
         const rawDate = req.startDate || req.start_date || req.createdAt || req.created_at || req.delivery_date || req.updated_at;
         
@@ -1094,7 +1109,7 @@ export function PlantDashboardScreen({ navigation }: any) {
         mappedOrders.push({
           id: reqId,
           campaign: reqTitle,
-          brand: String(req.brand_name || req.brandName || 'Brand Partner'),
+          brand: reqBrand,
           location: String(req.location_name || req.target_location || req.location_filter?.city || 'Chennai'),
           quantityNum: totalTarget,
           bottledNum: completedCount,
@@ -1105,15 +1120,16 @@ export function PlantDashboardScreen({ navigation }: any) {
         });
       });
 
-      // 2. Map brand & admin campaigns from production database
-      const allCampaignsList = [...brandCampaigns, ...adminCampaigns];
-      allCampaignsList.forEach((camp: any) => {
+      // 2. Map all live real campaigns from database (e.g. abcd, akssh, tessst, prakashraaji, muthu)
+      auditCampaigns.forEach((camp: any) => {
         const campId = String(camp.id || camp._id || `CMP_${Math.random()}`);
-        const campTitle = String(camp.title || camp.campaign_title || 'Commercial Batch');
+        const campTitle = String(camp.title || camp.name || camp.campaign_name || camp.campaignName || camp.campaign_title || camp.campaign || camp.tag || camp.id || '');
+        const campBrand = String(camp.brand_name || camp.brand || 'Brand Partner');
         const lowTitle = safeLower(campTitle);
-        const rawDate = camp.startDate || camp.start_date || camp.createdAt || camp.created_at || camp.delivery_date || camp.updated_at;
 
-        if (!seenIds.has(campId) && !seenTitles.has(lowTitle)) {
+        if (isDemoCampaign(campTitle, campBrand, campId)) return;
+
+        if (!seenIds.has(campId) && !seenTitles.has(lowTitle) && campTitle) {
           const totalTarget = Number(camp.target_sticker_count || camp.totalNum || 5000);
           const matchingScanCount = Math.max(
             scanCountsByCampId.get(campId) || 0,
@@ -1133,20 +1149,58 @@ export function PlantDashboardScreen({ navigation }: any) {
           mappedOrders.push({
             id: campId,
             campaign: campTitle,
-            brand: String(camp.brand_name || camp.brand || `${campTitle} Partner`),
+            brand: campBrand,
             location: String(resolvedLoc),
             quantityNum: totalTarget,
             bottledNum: completedCount,
             status: isDone ? 'COMPLETED' : completedCount > 0 ? 'BOTTLING' : 'PENDING',
             revenue: totalTarget * 10.00,
             plant_id: camp.plant_id ? String(camp.plant_id) : undefined,
-            startDate: rawDate ? String(rawDate) : undefined,
+            startDate: camp.startDate || camp.start_date || camp.createdAt || camp.created_at || camp.delivery_date || camp.updated_at,
           });
         }
       });
 
+      // Sort orders newest first so newly created campaigns (like 'abcd') appear on top
+      mappedOrders.sort((a, b) => {
+        const timeA = new Date(a.startDate || 0).getTime();
+        const timeB = new Date(b.startDate || 0).getTime();
+        return timeB - timeA;
+      });
+
+      const campaignMap = new Map<string, { title: string; brand: string; id: string }>();
+      allCampaignsList.forEach((camp: any) => {
+        const cId = String(camp.id || camp._id || '').trim();
+        const cTitle = String(camp.title || camp.name || camp.campaign_name || camp.campaignName || camp.campaign_title || camp.campaign || '').trim();
+        const cBrand = String(camp.brand_name || camp.brand || 'Offfline Partner').trim();
+        if (cId && cTitle && !isDemoCampaign(cTitle, cBrand, cId)) {
+          campaignMap.set(cId, { title: cTitle, brand: cBrand, id: cId });
+          campaignMap.set(cId.toLowerCase(), { title: cTitle, brand: cBrand, id: cId });
+          campaignMap.set(cId.replace(/^REQ_|^CMP_/, ''), { title: cTitle, brand: cBrand, id: cId });
+        }
+      });
+      mappedOrders.forEach((ord) => {
+        if (ord.id && ord.campaign) {
+          campaignMap.set(String(ord.id), { title: ord.campaign, brand: ord.brand, id: ord.id });
+          campaignMap.set(String(ord.id).toLowerCase(), { title: ord.campaign, brand: ord.brand, id: ord.id });
+          const cleanId = ord.id.replace(/^REQ_|^CMP_/, '');
+          if (cleanId) campaignMap.set(cleanId, { title: ord.campaign, brand: ord.brand, id: ord.id });
+        }
+      });
+
+      const lookupObj: Record<string, string> = {};
+      campaignMap.forEach((val, key) => {
+        if (val.title) lookupObj[key] = val.title;
+      });
+      setCampaignsLookup(lookupObj);
+
       setOrders(mappedOrders);
-      setSelectedScanCampaign((prev) => prev || mappedOrders[0]);
+      setSelectedScanCampaign((prev) => {
+        if (!prev || isDemoCampaign(prev.campaign, prev.brand, prev.id) || !mappedOrders.some((o) => o.id === prev.id)) {
+          return mappedOrders[0] || null;
+        }
+        return prev;
+      });
 
       // Compute live dynamic summary metrics from 100% real production data
       let activeJobs = 0;
@@ -1165,115 +1219,86 @@ export function PlantDashboardScreen({ navigation }: any) {
       setBottledDispatchedCans(totalBottled);
       setBottlingCommissionTotal(commission);
 
-      // 3. Map Real Settlements from Production (strictly isolate PLANT role at ₹10.00/can)
+      // 3. Map Real Settlements from Production
       const now = new Date();
-      const currentHour = now.getHours();
-      const isEodCutoffPassedToday = currentHour >= 22; // 10:00 PM EOD
-      const todayStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       const todayDateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-      const formatSettlementDate = (rawD?: string) => {
-        if (!rawD) return todayDateStr;
-        const str = String(rawD).trim();
-        if (/^\d{1,2}\s+[A-Za-z]{3,4}\s+\d{4}$/.test(str)) {
-          return str;
-        }
-        const d = new Date(str);
-        return !isNaN(d.getTime())
-          ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-          : str.replace(/^Today,\s*/i, '');
-      };
-      
-      const serverSettlements: SettlementRecord[] = [];
-
-      const rawSettlements = settRes?.data?.settlements || (Array.isArray(settRes?.data) ? settRes?.data : []);
-      if (Array.isArray(rawSettlements) && rawSettlements.length > 0) {
-        rawSettlements.forEach((s: any) => {
-          // Strictly isolate for PLANT role! Exclude PRESS / DISTRIBUTOR records
-          const payeeType = String(s.payeeType || s.payee_role || s.role || s.entityType || '').toUpperCase();
-          if (payeeType && payeeType !== 'PLANT' && (payeeType.includes('PRESS') || payeeType.includes('DISTRIBUTOR'))) {
-            return;
-          }
-
-          const rawAmount = s.grossAmount ?? s.netPayout ?? s.amount;
-          const parsedAmount = typeof rawAmount === 'number'
-            ? rawAmount
-            : Number(String(rawAmount || '').replace(/[^0-9.]/g, '')) || 0;
-
-          const bCount = Number(s.bottlesFilled || s.completedQuantity || s.scans_count || s.total_scans || s.bottlesCount || 10);
-          const locTitle = String(s.locationTitle || s.locationName || s.location || s.plant_name || currentUser?.companyName || 'Kilpauk Bottling Facility');
-          const dTime = String(s.deliveryTime || (s.created_at || s.settledAt ? new Date(s.created_at || s.settledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:30 AM'));
-          const resolvedGps = resolveLocationGps(locTitle);
-          const gpsStr = s.gpsCoords || `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`;
-
-          // Plant commission is ₹10.00 / can
-          const parsedCommission = parsedAmount >= bCount * 5.0 ? parsedAmount : bCount * 10.00;
-
-          const rawDate = s.settlementDate || s.deliveryDate || s.date || s.createdAt || s.created_at || s.settledAt;
-          const formattedDate = formatSettlementDate(rawDate);
-
-          serverSettlements.push({
-            id: String(s.id || s._id || `SET_${Math.random().toString().slice(-4)}`),
-            campaignTitle: String(s.campaignTitle || s.campaign_title || s.campaign_name || 'Commercial Batch'),
-            brandName: String(s.entityName || s.payeeName || s.brand_name || 'Production Partner'),
-            bottlesCount: bCount,
-            commission: parsedCommission,
-            deliveryDate: formattedDate,
-            deliveryTime: dTime,
-            locationTitle: locTitle,
-            gpsCoords: gpsStr,
-            ipAddress: String(s.ipAddress || '127.0.0.1 (Local Node)'),
-            settlementStatus: String(s.status || s.settlementStatus || '').toUpperCase().includes('PAID') || String(s.status || s.settlementStatus || '').toUpperCase().includes('SETTLED') ? 'SETTLED' : 'PENDING',
-          });
+      // Map live verified scans from real database query sorted newest first
+      const sortedScans = [...allScans]
+        .filter((s: any) => {
+          const sTitle = String(s.campaign_title || s.campaign_name || s.title || '');
+          const sId = String(s.campaign_id || s.campaignId || s.campaign || '');
+          const sBrand = String(s.brand_name || s.brand || '');
+          if (isDemoCampaign(sTitle, sBrand, sId)) return false;
+          if (sId.toLowerCase().includes('test') || sId.toLowerCase().includes('mock')) return false;
+          return true;
+        })
+        .sort((a: any, b: any) => {
+          const timeA = new Date(a.created_at || a.scanned_at || a.timestamp || a.date || 0).getTime();
+          const timeB = new Date(b.created_at || b.scanned_at || b.timestamp || b.date || 0).getTime();
+          return timeB - timeA;
         });
-      }
 
-      // Build dynamic campaign settlements from ALL active & completed campaign orders (Web parity)
-      const campaignSettlements: SettlementRecord[] = mappedOrders.map((ord, oIdx) => {
-        const isCompleted = ord.status === 'COMPLETED' || ord.bottledNum >= ord.quantityNum;
-        const count = isCompleted ? ord.quantityNum : (ord.bottledNum > 0 ? ord.bottledNum : ord.quantityNum);
-        const resolvedGps = resolveLocationGps(ord.location);
-        const resolvedIp = resolveLocationIp(ord.location);
+      const realScanRecords: SettlementRecord[] = sortedScans.map((s: any, idx: number) => {
+        const rawDate = s.created_at || s.scanned_at || s.timestamp || s.date;
+        const d = rawDate ? new Date(rawDate) : new Date();
+        const formattedDate = !isNaN(d.getTime())
+          ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : todayDateStr;
+        const formattedTime = formatDynamicScanTime(rawDate);
+        const loc = s.location_name || s.locationTitle || s.location || (s.plant_name || currentUser?.companyName || 'Kilpauk Bottling Facility');
+        const resolvedGps = resolveLocationGps(loc);
 
-        const d = ord.startDate ? new Date(ord.startDate) : null;
-        const orderDateStartOfDay = d && !isNaN(d.getTime()) ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() : todayStartOfDay;
-        const isPastDay = orderDateStartOfDay < todayStartOfDay;
-        const isToday = orderDateStartOfDay === todayStartOfDay;
-        const isSettled = isPastDay || (isToday && isEodCutoffPassedToday) || isCompleted;
-
-        const formattedDate = formatSettlementDate(ord.startDate);
+        const sCampId = String(s.campaign_id || s.campaignId || s.campaign || '').trim();
+        const matchedCamp = (sCampId && campaignMap.get(sCampId)) || 
+                            (sCampId && campaignMap.get(sCampId.toLowerCase())) || 
+                            (sCampId && campaignMap.get(sCampId.replace(/^REQ_|^CMP_/, ''))) || 
+                            mappedOrders.find((o) => o.id === sCampId);
+        const matchedTitle = matchedCamp ? ('title' in matchedCamp ? matchedCamp.title : (matchedCamp as any).campaign) : undefined;
+        const rawCampTitle = s.campaign_title || s.campaign_name || s.campaignName || s.title || s.name || matchedTitle;
+        const sCampTitle = rawCampTitle && !isDemoCampaign(rawCampTitle) && rawCampTitle !== 'Production Scan' ? String(rawCampTitle) : (matchedTitle || '');
+        const sBrand = String(
+          s.brand_name ||
+          s.brand ||
+          s.brandName ||
+          matchedCamp?.brand ||
+          'Offfline Verified'
+        );
 
         return {
-          id: `SETTLE_PLT_${ord.id.replace(/[^a-zA-Z0-9]/g, '_').slice(-12)}_${oIdx}`,
-          campaignTitle: ord.campaign,
-          brandName: ord.brand || 'Brand Partner',
-          bottlesCount: count,
-          commission: count * 10.00,
+          id: String(s.qr_id || s.qr_code || s.can_id || s.id || `CAN_${idx + 1}`),
+          campaignId: sCampId || matchedCamp?.id || (mappedOrders[0]?.id ? String(mappedOrders[0].id) : ''),
+          campaignTitle: sCampTitle,
+          brandName: sBrand,
+          bottlesCount: 1,
+          commission: 10.00,
           deliveryDate: formattedDate,
-          deliveryTime: '10:00 PM EOD',
-          locationTitle: `${ord.location} Bottling Facility`,
-          gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-          ipAddress: resolvedIp,
-          settlementStatus: isSettled ? 'SETTLED' : 'PENDING',
+          deliveryTime: formattedTime,
+          locationTitle: loc,
+          gpsCoords: s.latitude && s.longitude ? `${Number(s.latitude).toFixed(4)}° N, ${Number(s.longitude).toFixed(4)}° E` : `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
+          ipAddress: String(s.ipAddress || s.ip || '127.0.0.1 (Local Node)'),
+          settlementStatus: 'SETTLED',
         };
       });
 
-      // Merge server settlements and campaign settlements with deduplication
-      const combined = [...serverSettlements, ...campaignSettlements];
-      const seenSettlementCampaigns = new Set<string>();
-      const productionSettlements: SettlementRecord[] = [];
-
-      combined.forEach((rec) => {
-        const normKey = (rec.campaignTitle || '').trim().toLowerCase();
-        if (normKey && !seenSettlementCampaigns.has(normKey)) {
-          seenSettlementCampaigns.add(normKey);
-          productionSettlements.push(rec);
-        } else if (!normKey) {
-          productionSettlements.push(rec);
-        }
+      realScanRecords.forEach((r) => {
+        if (r.id) scannedQrSetRef.current.add(r.id);
       });
 
-      setLedgerRecords(productionSettlements);
+      setLedgerRecords((prev) => {
+        // Retain any scans from current session that might not yet be indexed on the server
+        const prevNewScans = prev.filter((p) => p.deliveryTime === 'Just now' || p.deliveryTime?.includes?.('m ago'));
+        const combinedList = [...prevNewScans, ...realScanRecords];
+        const seenScanIds = new Set<string>();
+        const deduped: SettlementRecord[] = [];
+        combinedList.forEach((item) => {
+          if (!seenScanIds.has(item.id)) {
+            seenScanIds.add(item.id);
+            deduped.push(item);
+          }
+        });
+        return deduped;
+      });
     } catch (e) {
       console.warn('Error fetching production data for Plant:', e);
     } finally {
@@ -1284,6 +1309,10 @@ export function PlantDashboardScreen({ navigation }: any) {
 
   useEffect(() => {
     loadProductionData();
+    const interval = setInterval(() => {
+      loadProductionData(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, [loadProductionData]);
 
   // ── Live Interactive Rate Booster (+100, +500, +5k) — Instant 0ms Optimistic UI ──
@@ -1365,18 +1394,25 @@ export function PlantDashboardScreen({ navigation }: any) {
       if (isScanningRef.current) return;
       isScanningRef.current = true;
       try {
-        const activeCamp = selectedScanCampaign || orders[0];
-        const cleanQr = extractCleanQrId(scannedCode);
+        const activeCamp = selectedScanCampaign || (orders && orders.length > 0 ? orders[0] : null);
+        const cleanQr = extractCleanQrId(scannedCode) || String(scannedCode).trim();
         if (!cleanQr) return;
+
+        // Immediate Duplicate Check (Prevents double counting for the same physical QR)
+        if (scannedQrSetRef.current.has(cleanQr)) {
+          triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+        }
+        scannedQrSetRef.current.add(cleanQr);
 
         const snapshotLoc = getLocationSnapshot();
         const coords = snapshotLoc
           ? { latitude: snapshotLoc.latitude, longitude: snapshotLoc.longitude, accuracy: snapshotLoc.accuracy }
           : resolveLocationGps(activeCamp?.location || currentLocationDisplay);
 
-        const scanPayload = {
+        const scanPayload: any = {
           qr_id: cleanQr,
-          campaign_id: activeCamp?.id || 'CMP_GEN_1',
+          campaign_id: activeCamp?.id || undefined,
           plant_id: activeCamp?.plant_id || (currentUser as any)?.plant_id || currentUser?._id || 'PLANT_CH_01',
           plant_name: (activeCamp as any)?.plant_name || plantProfileName || currentUser?.fullName || 'Water Plant Facility',
           location_name: activeCamp?.location || currentLocationDisplay,
@@ -1385,95 +1421,69 @@ export function PlantDashboardScreen({ navigation }: any) {
           accuracy: coords.accuracy || 5.0,
         };
 
-        const res = await plantApi.scanQr(scanPayload);
-        if (res.data?.success) {
-          const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
-          if (isRescan) {
-            triggerToast(`⚠️ Already Scanned: QR (${res.data.can_id || cleanQr}) was already recorded!`);
-            return res.data;
+        let serverRes: any = null;
+        try {
+          serverRes = await plantApi.scanQr(scanPayload);
+        } catch (apiErr: any) {
+          // If campaign mismatch or 400, retry without forcing campaign_id so backend matches authentic campaign
+          if (apiErr?.response?.data?.code === 'CAMPAIGN_MISMATCH' || (apiErr?.response?.status === 400 && scanPayload.campaign_id)) {
+            try {
+              const fallbackPayload = { ...scanPayload };
+              delete fallbackPayload.campaign_id;
+              serverRes = await plantApi.scanQr(fallbackPayload);
+            } catch (retryErr: any) {
+              const isDupRetry =
+                retryErr?.response?.status === 409 ||
+                retryErr?.response?.data?.already_scanned ||
+                retryErr?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
+                retryErr?.response?.data?.message?.toLowerCase?.()?.includes('already');
+
+              if (isDupRetry) {
+                triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+                return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+              }
+            }
+          } else {
+            const isDup =
+              apiErr?.response?.status === 409 ||
+              apiErr?.response?.data?.already_scanned ||
+              apiErr?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
+              apiErr?.response?.data?.message?.toLowerCase?.()?.includes('already');
+
+            if (isDup) {
+              triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+              return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
+            }
           }
-
-          const updatedCount = Number(res.data.current_count || (bottledDispatchedCans + 1));
-          setScannerCount((c) => c + 1);
-          setBottledDispatchedCans((prev) => prev + 1);
-          setBottlingCommissionTotal((prev) => prev + 10.00);
-
-          if (activeCamp) {
-            setOrders((prev) =>
-              prev.map((ord) => {
-                if (ord.id === activeCamp.id) {
-                  const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
-                  return {
-                    ...ord,
-                    bottledNum: nextBottled,
-                    status: nextBottled >= ord.quantityNum ? 'COMPLETED' : 'BOTTLING',
-                  };
-                }
-                return ord;
-              })
-            );
-          }
-
-          // Add to plant production ledger
-          const resolvedGps = resolveLocationGps(activeCamp?.location || currentLocationDisplay);
-          const todayDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-          const newLedgerItem: SettlementRecord = {
-            id: `PLANT-${Date.now().toString().slice(-4)}`,
-            campaignTitle: activeCamp?.campaign || 'Water Bottling Campaign',
-            brandName: activeCamp?.brand || 'Verified Brand',
-            bottlesCount: 1,
-            commission: 10.00,
-            deliveryDate: todayDateStr,
-            deliveryTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            locationTitle: `${activeCamp?.location || currentLocationDisplay} Bottling Facility`,
-            gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-            ipAddress: '127.0.0.1 (Local Node)',
-            settlementStatus: 'SETTLED',
-          };
-          setLedgerRecords((prev) => [newLedgerItem, ...prev]);
-
-          triggerToast(`✓ Can ${res.data.can_id || cleanQr} verified & bottled!`);
-          return res.data;
-        }
-        return res.data;
-      } catch (err: any) {
-        const isDup =
-          err?.response?.status === 409 ||
-          err?.response?.data?.already_scanned ||
-          err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
-          err?.response?.data?.message?.toLowerCase?.()?.includes('already');
-
-        if (isDup) {
-          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already recorded!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
         }
 
-        const errMsg = err?.response?.data?.message || 'Scan verification failed';
-        triggerToast(`❌ ${errMsg}`);
-        throw err;
-      } finally {
-        isScanningRef.current = false;
-      }
-    },
-    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, bottledDispatchedCans]
-  );
+        const isRescan = Boolean(serverRes?.data?.is_rescan || serverRes?.data?.already_scanned);
+        if (isRescan) {
+          const dupCanId = serverRes?.data?.can_id || cleanQr;
+          triggerToast(`⚠️ Already Scanned: QR (${dupCanId}) was already recorded!`);
+          return { success: false, already_scanned: true, is_rescan: true, can_id: dupCanId };
+        }
 
-  const handleSimulateBulkPlant = useCallback(
-    async (amount: number) => {
-      const activeCamp = selectedScanCampaign || orders[0];
-      const campId = activeCamp?.id || 'CMP_GEN_1';
+        const canIdRecorded = serverRes?.data?.can_id || cleanQr;
+        const resCampaignId = serverRes?.data?.campaign_id || activeCamp?.id;
+        const serverCampTitle = serverRes?.data?.campaign_title || serverRes?.data?.campaign?.title;
+        const resCampaignTitle =
+          serverCampTitle ||
+          (resCampaignId && campaignsLookup[resCampaignId]) ||
+          (resCampaignId && campaignsLookup[resCampaignId.toLowerCase()]) ||
+          activeCamp?.campaign ||
+          'Production Scan';
+        const updatedCount = Number(serverRes?.data?.current_count || (bottledDispatchedCans + 1));
 
-      try {
-        await plantApi.bulkSimulateScans(campId, amount);
-        setScannerCount((c) => c + amount);
-        setBottledDispatchedCans((prev) => prev + amount);
-        setBottlingCommissionTotal((prev) => prev + amount * 10.00);
+        setScannerCount((c) => c + 1);
+        setBottledDispatchedCans((prev) => prev + 1);
+        setBottlingCommissionTotal((prev) => prev + 10.00);
 
-        if (activeCamp) {
+        if (activeCamp || resCampaignId) {
           setOrders((prev) =>
             prev.map((ord) => {
-              if (ord.id === activeCamp.id) {
-                const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + amount);
+              if (ord.id === resCampaignId || ord.id === activeCamp?.id) {
+                const nextBottled = Math.min(ord.quantityNum, ord.bottledNum + 1);
                 return {
                   ...ord,
                   bottledNum: nextBottled,
@@ -1485,55 +1495,61 @@ export function PlantDashboardScreen({ navigation }: any) {
           );
         }
 
-        // Optimistically update Settlement records dynamically!
-        const todayDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        setLedgerRecords((prev) => {
-          const existingIdx = prev.findIndex(
-            (r) => r.deliveryDate === todayDateStr && (r.campaignTitle === activeCamp?.campaign || r.id.includes(campId.slice(-6)))
-          );
-          if (existingIdx >= 0) {
-            const updated = [...prev];
-            const cur = updated[existingIdx];
-            updated[existingIdx] = {
-              ...cur,
-              bottlesCount: cur.bottlesCount + amount,
-              commission: cur.commission + amount * 10.00,
-            };
-            return updated;
-          } else {
-            const resolvedGps = resolveLocationGps(activeCamp?.location || currentLocationDisplay);
-            const newRecord: SettlementRecord = {
-              id: `SET_LIVE_${campId.slice(-4)}_${Date.now().toString().slice(-4)}`,
-              campaignTitle: activeCamp?.campaign || 'Commercial Hydration Batch',
-              brandName: activeCamp?.brand || 'Production Partner',
-              bottlesCount: amount,
-              commission: amount * 10.00,
-              deliveryDate: todayDateStr,
-              deliveryTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              locationTitle: `${activeCamp?.location || currentLocationDisplay} Bottling Facility`,
-              gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-              ipAddress: '127.0.0.1 (Local Node)',
-              settlementStatus: 'SETTLED',
-            };
-            return [newRecord, ...prev];
-          }
-        });
+        // Invalidate API caches immediately
+        apiCache.clear();
 
-        triggerToast(`🎉 Bulk batch of ${amount.toLocaleString()} cans recorded & verified!`);
-      } catch (e) {
-        triggerToast(`❌ Bulk simulation failed`);
+        // Add to plant production ledger with dynamic 'Just now' time
+        const resolvedGps = resolveLocationGps(activeCamp?.location || currentLocationDisplay);
+        const todayDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const newLedgerItem: SettlementRecord = {
+          id: canIdRecorded,
+          campaignId: resCampaignId,
+          campaignTitle: resCampaignTitle,
+          brandName: activeCamp?.brand || 'Offfline Verified',
+          bottlesCount: 1,
+          commission: 10.00,
+          deliveryDate: todayDateStr,
+          deliveryTime: 'Just now',
+          locationTitle: `${activeCamp?.location || currentLocationDisplay} Bottling Facility`,
+          gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
+          ipAddress: '127.0.0.1 (Local Node)',
+          settlementStatus: 'SETTLED',
+        };
+        setLedgerRecords((prev) => [newLedgerItem, ...prev.filter((p) => p.id !== canIdRecorded)]);
+
+        triggerToast(`✓ Can ${canIdRecorded} verified & bottled!`);
+        return { success: true, can_id: canIdRecorded, current_count: updatedCount };
+      } catch (err: any) {
+        console.warn('Scan processing error:', err);
+      } finally {
+        isScanningRef.current = false;
       }
     },
-    [selectedScanCampaign, orders, currentLocationDisplay]
+    [selectedScanCampaign, orders, currentUser, plantProfileName, getLocationSnapshot, currentLocationDisplay, bottledDispatchedCans, campaignsLookup, triggerToast]
+  );
+
+  const handleSimulateBulkPlant = useCallback(
+    async (amount: number) => {
+      const activeCamp = selectedScanCampaign || orders[0];
+      for (let i = 0; i < amount; i++) {
+        const generatedQrId = `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`;
+        await handleRealQrScanned(generatedQrId);
+        if (i < amount - 1) {
+          await new Promise((r) => setTimeout(r, 60));
+        }
+      }
+    },
+    [selectedScanCampaign, orders, handleRealQrScanned]
   );
 
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
     if (totalScannedInSession > 0) {
       triggerToast(`🎉 Batch of ${totalScannedInSession} cans recorded & verified!`);
-      loadProductionData().catch(() => {});
+      apiCache.clear();
+      loadProductionData(true).catch(() => {});
     }
-  }, [loadProductionData]);
+  }, [loadProductionData, triggerToast]);
 
   // ── Live QR Scan Execution on Production Server (Instant 0ms) ──
   const handlePerformLiveScan = useCallback(() => {
@@ -1748,8 +1764,6 @@ export function PlantDashboardScreen({ navigation }: any) {
         style={styles.mainScroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1760,369 +1774,126 @@ export function PlantDashboardScreen({ navigation }: any) {
           />
         }
       >
-        {/* ── TAB 1: WORK ORDERS (Persistent layout container for 0ms instant tab switching) ── */}
-        <View style={{ display: activeTab === 'work-orders' ? 'flex' : 'none' }}>
-          {/* ── UNIFIED MASTER METRICS CARD (Apple Liquid Frosted Glass) ── */}
-          <View style={styles.unifiedGlassMasterCard}>
-            <View style={styles.glassCardSpecularShine} />
-
-            {/* Row 1 */}
-            <View style={styles.metricsGridRow}>
-              {/* 1. Active Work Orders */}
-              <AnimatedGlassMetricTile
-                loading={loading}
-                icon={<DocSheetIcon size={15} color="#2563EB" />}
-                iconBgColor="#EFF6FF"
-                unitText="Jobs"
-                unitTextColor="#475569"
-                unitBgColor="#F1F5F9"
-                value={activeJobsCount}
-                label="Active Work Orders"
-                delay={0}
-              />
-
-              {/* 2. Bottles In Production */}
-              <AnimatedGlassMetricTile
-                loading={loading}
-                icon={<BottleBadgeIcon size={16} color="#056B4A" />}
-                iconBgColor="#ECF7F2"
-                unitText="Cans"
-                unitTextColor="#475569"
-                unitBgColor="#F1F5F9"
-                value={inProductionCans.toLocaleString('en-IN')}
-                label="Bottles In Production"
-                delay={60}
-              />
-            </View>
-
-            {/* Row 2 */}
-            <View style={styles.metricsGridRow}>
-              {/* 3. Bottled / Dispatched */}
-              <AnimatedGlassMetricTile
-                loading={loading}
-                icon={<TruckBadgeIcon size={15} color="#16A34A" />}
-                iconBgColor="#F0FDF4"
-                unitText="Cans"
-                unitTextColor="#475569"
-                unitBgColor="#F1F5F9"
-                value={bottledDispatchedCans.toLocaleString('en-IN')}
-                label="Bottled / Dispatched"
-                delay={120}
-              />
-
-              {/* 4. Bottling Commission */}
-              <AnimatedGlassMetricTile
-                loading={loading}
-                icon={<RupeeBadgeIcon size={15} color="#7C3AED" />}
-                iconBgColor="#F5F3FF"
-                unitText="₹10 / can"
-                unitTextColor="#7C3AED"
-                unitBgColor="#F5F3FF"
-                value={`₹${bottlingCommissionTotal.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`}
-                label="Bottling Commission"
-                delay={180}
-              />
-            </View>
-          </View>
-
-          {/* ── SEARCH BAR (Pill Rounded Search Bar Matching Attachment) ── */}
-          <View style={styles.searchContainer}>
-            <Search color="#94A3B8" size={17} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search campaign, brand, or location..."
-              placeholderTextColor="#94A3B8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCorrect={false}
-            />
-            {searchQuery.length > 0 && (
-              <NativePressable
-                onPress={() => {
-                  setSearchQuery('');
-                  setDebouncedSearchQuery('');
-                }}
-                style={styles.clearSearchBtn}
-                hapticType="selection"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <X color="#94A3B8" size={18} />
-              </NativePressable>
-            )}
-          </View>
-
-          {/* ── STATUS FILTER TABS (All | Pending | Completed Matching Attachment) ── */}
-          <View style={styles.filterPills}>
-            {(['ALL', 'PENDING', 'COMPLETED'] as const).map((tab) => {
-              const label = tab === 'ALL' ? 'All' : tab === 'PENDING' ? 'Pending' : 'Completed';
-              const isActive = activeFilter === tab;
-              return (
-                <NativePressable
-                  key={tab}
-                  style={[styles.filterPill, isActive && styles.filterPillActive]}
-                  onPress={() => setActiveFilter(tab)}
-                  hapticType="selection"
-                  scaleActive={0.96}
-                >
-                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                    {label}
-                  </Text>
-                </NativePressable>
-              );
-            })}
-          </View>
-
-          {/* ── WORK ORDERS LIST (Memoized Apple Minimalist Cards & Skeletons) ── */}
-          <View style={styles.ordersList}>
-            {loading && orders.length === 0 ? (
-              <>
-                <OrderCardSkeleton />
-                <OrderCardSkeleton />
-                <OrderCardSkeleton />
-              </>
-            ) : filteredOrders.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Droplets color="#94A3B8" size={32} />
-                <Text style={styles.emptyTitle}>No work orders match this filter</Text>
-                <Text style={styles.emptySubtitle}>Try selecting another location pill or search term.</Text>
+        <View style={styles.dashboardContainer}>
+          {/* ── 1. SINGLE PRIMARY STAT CARD: "TODAY'S SCANS" ── */}
+          <View style={styles.singleMasterCard}>
+            <View style={styles.singleStatCardHeader}>
+              <Text style={styles.singleStatMainHeading}>Today's Scans</Text>
+              <View style={styles.singleStatDateBadge}>
+                <Text style={styles.singleStatDateText}>{todayLabel}</Text>
               </View>
-            ) : (
-              <>
-                {displayedOrders.map((order) => (
-                  <PlantOrderCardItem
-                    key={order.id}
-                    order={order}
-                    onSelect={setSelectedDetailOrder}
-                    onBoost={handleBoostScans}
-                  />
-                ))}
-
-                {/* ── Pagination / Lazy Loading Footer ── */}
-                {filteredOrders.length > PAGE_SIZE && (
-                  <View style={styles.paginationContainer}>
-                    {filteredOrders.length > ordersLimit ? (
-                      <NativePressable
-                        style={styles.loadMoreBtn}
-                        onPress={() => setOrdersLimit((prev) => Math.min(prev + PAGE_SIZE, filteredOrders.length))}
-                        hapticType="selection"
-                        scaleActive={0.95}
-                      >
-                        <Text style={styles.loadMoreBtnText}>
-                          Load More (+{Math.min(PAGE_SIZE, filteredOrders.length - ordersLimit)})
-                        </Text>
-                        <ChevronDown size={15} color="#047857" />
-                      </NativePressable>
-                    ) : (
-                      <View style={styles.allLoadedBadge}>
-                        <Check size={13} color="#059669" />
-                        <Text style={styles.allLoadedText}>Showing all {filteredOrders.length} orders</Text>
-                      </View>
-                    )}
-                    <Text style={styles.paginationCountSub}>
-                      {displayedOrders.length} of {filteredOrders.length} orders loaded
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* ── TAB 2: SETTLEMENT REPORT (Persistent layout container for 0ms instant tab switching) ── */}
-        <View style={{ display: activeTab === 'settlement-report' ? 'flex' : 'none' }}>
-          <View style={styles.settlementSection}>
-            <Text style={styles.settlementHeaderTitle}>Settlements</Text>
-
-            {/* Split Interactive Filter Card matching reference design */}
-            <View style={styles.settlementSummaryCard}>
-              {/* Left Column: Settled */}
-              <NativePressable
-                style={[
-                  styles.settlementSummaryBtn,
-                  settlementFilter === 'SETTLED' && styles.settlementSummaryBtnActiveSettled,
-                ]}
-                onPress={handleToggleSettledFilter}
-                scaleActive={0.96}
-                hapticType="impactLight"
-              >
-                {/* Header Row: Icon Squircle + Title + Chevron */}
-                <View style={styles.settlementHeaderRow}>
-                  <View style={[styles.settledIconSquircle, settlementFilter === 'SETTLED' && styles.settledIconSquircleActive]}>
-                    <Check size={14} color={settlementFilter === 'SETTLED' ? '#047857' : '#059669'} strokeWidth={2.8} />
-                  </View>
-                  <View style={styles.settlementLabelWrap}>
-                    <Text style={[styles.settlementTitleText, settlementFilter === 'SETTLED' && styles.settlementTitleTextActiveSettled]}>Settled</Text>
-                    <ChevronRight size={13} color={settlementFilter === 'SETTLED' ? '#059669' : '#94A3B8'} strokeWidth={2.4} />
-                  </View>
-                </View>
-
-                {/* Amount */}
-                <Text style={styles.settlementAmountSettled} numberOfLines={1} adjustsFontSizeToFit>
-                  ₹{totalSettledAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: totalSettledAmount % 1 === 0 ? 0 : 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Text>
-
-                {/* Subtext */}
-                <Text style={styles.settlementMetaText}>
-                  {settledCount} {settledCount === 1 ? 'batch' : 'batches'} cleared
-                </Text>
-
-                {/* Bottom Pill Tag */}
-                <View style={[styles.settledPill, settlementFilter === 'SETTLED' && styles.settledPillActive]}>
-                  <Landmark size={11} color="#059669" strokeWidth={2.2} />
-                  <Text style={styles.settledPillText} numberOfLines={1}>Disbursed to Bank Account</Text>
-                </View>
-              </NativePressable>
-
-              {/* Vertical Divider */}
-              <View style={styles.settlementSummaryDivider} />
-
-              {/* Right Column: In Cycle */}
-              <NativePressable
-                style={[
-                  styles.settlementSummaryBtn,
-                  settlementFilter === 'IN_CYCLE' && styles.settlementSummaryBtnActivePending,
-                ]}
-                onPress={handleToggleInCycleFilter}
-                scaleActive={0.96}
-                hapticType="impactLight"
-              >
-                {/* Header Row: Icon Squircle + Title + Chevron */}
-                <View style={styles.settlementHeaderRow}>
-                  <View style={[styles.pendingIconSquircle, settlementFilter === 'IN_CYCLE' && styles.pendingIconSquircleActive]}>
-                    <Clock size={14} color={settlementFilter === 'IN_CYCLE' ? '#C2410C' : '#EA580C'} strokeWidth={2.4} />
-                  </View>
-                  <View style={styles.settlementLabelWrap}>
-                    <Text style={[styles.settlementTitleText, settlementFilter === 'IN_CYCLE' && styles.settlementTitleTextActivePending]}>In Cycle</Text>
-                    <ChevronRight size={13} color={settlementFilter === 'IN_CYCLE' ? '#EA580C' : '#94A3B8'} strokeWidth={2.4} />
-                  </View>
-                </View>
-
-                {/* Amount */}
-                <Text style={styles.settlementAmountPending} numberOfLines={1} adjustsFontSizeToFit>
-                  ₹{yetToSettleAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: yetToSettleAmount % 1 === 0 ? 0 : 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Text>
-
-                {/* Subtext */}
-                <Text style={styles.settlementMetaText}>
-                  {pendingCount} {pendingCount === 1 ? 'batch' : 'batches'} pending
-                </Text>
-
-                {/* Bottom Pill Tag */}
-                <View style={[styles.pendingPill, settlementFilter === 'IN_CYCLE' && styles.pendingPillActive]}>
-                  <Calendar size={11} color="#D97706" strokeWidth={2.2} />
-                  <Text style={styles.pendingPillText} numberOfLines={1}>Scheduled at 10:00 PM EOD</Text>
-                </View>
-              </NativePressable>
             </View>
 
-            {/* Minimalist History Section Header */}
-            <View style={styles.historySectionHeader}>
-              <View style={styles.historySectionTitleRow}>
-                <Text style={styles.historySectionTitle}>Payout History</Text>
-                {settlementFilter !== 'ALL' && (
-                  <NativePressable
-                    style={styles.activeFilterChip}
-                    onPress={() => setSettlementFilter('ALL')}
-                    scaleActive={0.88}
-                    hapticType="selection"
-                  >
-                    <Text style={styles.activeFilterChipText}>
-                      {settlementFilter === 'SETTLED' ? 'Settled only' : 'In Cycle only'}
-                    </Text>
-                    <X size={10} color="#475569" strokeWidth={2.4} />
-                  </NativePressable>
-                )}
-              </View>
-              <Text style={styles.historySectionMeta}>
-                {filteredLedgerRecords.length} {filteredLedgerRecords.length === 1 ? 'entry' : 'entries'}
+            <View style={styles.singleStatNumberBlock}>
+              <Text style={styles.singleStatHugeValue} numberOfLines={1} adjustsFontSizeToFit>
+                {loading ? '...' : ledgerRecords.length.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </View>
+
+          {/* ── 2. OPERATIONAL ZONE BAR ── */}
+          <View style={styles.zoneStatusBar}>
+
+            <View style={styles.zoneStatusLeft}>
+              <MapPin size={16} color="#0F172A" />
+              <Text style={styles.zoneStatusLabel}>Active Plant Zone:</Text>
+              <Text style={styles.zoneStatusValue}>{currentLocationDisplay}</Text>
+            </View>
+            <NativePressable
+              style={styles.zoneStatusChangeBtn}
+              onPress={() => setShowLocationPicker(true)}
+              hapticType="selection"
+              scaleActive={0.94}
+            >
+              <Text style={styles.zoneStatusChangeText}>Change</Text>
+            </NativePressable>
+          </View>
+
+          {/* ── 4. RECENT VERIFIED SCANS FEED ── */}
+          <View style={styles.recentScansSection}>
+            <View style={styles.recentScansHeaderRow}>
+              <Text style={styles.recentScansSectionTitle}>Recent Scans</Text>
+              <Text style={styles.recentScansCountText}>
+                {ledgerRecords.length} {ledgerRecords.length === 1 ? 'scan' : 'scans'} today
               </Text>
             </View>
 
-            {/* Settlement Cards: Date-Wise Groups */}
-            <View style={styles.settlementList}>
-              {loading && ledgerRecords.length === 0 ? (
-                <>
-                  <SettlementCardSkeleton />
-                  <SettlementCardSkeleton />
-                  <SettlementCardSkeleton />
-                </>
-              ) : ledgerRecords.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <TrendingUp color="#94A3B8" size={32} />
-                  <Text style={styles.emptyTitle}>No settlements recorded</Text>
-                  <Text style={styles.emptySubtitle}>Dispatched bottling batches will generate financial settlements here.</Text>
+            {ledgerRecords.length === 0 ? (
+              <View style={styles.emptyRecentCard}>
+                <View style={styles.emptyRecentIconCircle}>
+                  <CameraIcon size={24} color="#94A3B8" />
                 </View>
-              ) : filteredLedgerRecords.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Clock color="#94A3B8" size={30} />
-                  <Text style={styles.emptyTitle}>
-                    {settlementFilter === 'IN_CYCLE' ? 'No pending in-cycle batches' : 'No settled batches'}
-                  </Text>
-                  <Text style={styles.emptySubtitle}>
-                    {settlementFilter === 'IN_CYCLE'
-                      ? 'All completed batches have already been settled and disbursed.'
-                      : 'No settled disbursements found for this period.'}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {settlementDateGroups.map((group) => {
-                    const isGroupExpanded =
-                      expandedDateGroups[group.date] !== undefined
-                        ? expandedDateGroups[group.date]
-                        : true;
+                <Text style={styles.emptyRecentTitle}>Ready for Bottling</Text>
+                <Text style={styles.emptyRecentSubtitle}>
+                  Tap the Scan button below to start scanning verified water cans.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.recentScansCardList}>
+                {ledgerRecords.slice(0, 15).map((item, idx) => {
+                  const rawCampTitle = (item.campaignTitle || '').trim();
+                  const isGeneric = !rawCampTitle || rawCampTitle === 'Production Scan' || rawCampTitle === 'Water Bottling Production' || /^[0-9a-f]{24}$/i.test(rawCampTitle);
 
-                    return (
-                      <PlantDateSettlementGroupCard
-                        key={group.date}
-                        group={group}
-                        isExpanded={isGroupExpanded}
-                        onToggle={() => handleToggleDateGroup(group.date, true)}
-                        expandedSettlementId={expandedSettlementId}
-                        onToggleSettlement={handleToggleSettlement}
-                        onViewModal={setSelectedSettlementModal}
-                      />
-                    );
-                  })}
+                  const resolvedTitle = !isGeneric
+                    ? rawCampTitle
+                    : (item.campaignId && campaignsLookup[item.campaignId]) ||
+                      (item.campaignId && campaignsLookup[item.campaignId.toLowerCase()]) ||
+                      (rawCampTitle && campaignsLookup[rawCampTitle]) ||
+                      (rawCampTitle && campaignsLookup[rawCampTitle.toLowerCase()]) ||
+                      orders.find((o) => o.id === item.campaignId)?.campaign ||
+                      orders[0]?.campaign ||
+                      'Verified Can';
 
-                  <View style={styles.allLoadedBadge}>
-                    <Check size={13} color="#059669" />
-                    <Text style={styles.allLoadedText}>Showing all {filteredLedgerRecords.length} {filteredLedgerRecords.length === 1 ? 'settlement' : 'settlements'} across {settlementDateGroups.length} {settlementDateGroups.length === 1 ? 'date' : 'dates'}</Text>
-                  </View>
-                </>
-              )}
-            </View>
+                  return (
+                    <View key={item.id || idx} style={styles.recentScanItemRow}>
+                      <View style={styles.recentScanItemLeft}>
+                        <View style={styles.recentScanCheckIcon}>
+                          <CheckCircle2 size={16} color="#0F172A" />
+                        </View>
+                        <View style={styles.recentScanInfoCol}>
+                          <Text style={styles.recentScanCodeText} numberOfLines={1}>
+                            {resolvedTitle}
+                          </Text>
+                          <Text style={styles.recentScanMetaText} numberOfLines={1}>
+                            {item.campaignId ? item.campaignId : item.id}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.recentScanTimeText}>
+                        {item.deliveryTime || 'Just now'}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
 
-      {/* ── 4. FIXED LIQUID GLASS BOTTOM NAVIGATION BAR ── */}
-      <LiquidGlassNavBar
-        leftTab={{
-          key: 'work-orders',
-          label: 'Work Orders',
-          icon: FileText,
-        }}
-        rightTab={{
-          key: 'settlement-report',
-          label: 'Settlement',
-          icon: TrendingUp,
-        }}
-        activeTab={activeTab}
-        onSelectTab={handleTabSelect}
-        onPressCenterScan={() => {
-          if (filteredOrders.length > 0) {
-            setSelectedScanCampaign(filteredOrders[0]);
-          }
-          setShowQrModal(true);
-        }}
-      />
+      {/* ── Floating Center Scan Orb Bar ── */}
+      <View style={styles.bottomFloatingContainer}>
+        <NativePressable
+          style={styles.floatingScanOrb}
+          onPress={() => {
+            if (orders.length > 0) {
+              setSelectedScanCampaign((prev) => {
+                if (!prev || !orders.some((o) => o.id === prev.id)) {
+                  return orders[0];
+                }
+                return prev;
+              });
+            }
+            setShowQrModal(true);
+          }}
+          hapticType="impactMedium"
+          scaleActive={0.92}
+        >
+          <QrCode size={26} color="#FFFFFF" strokeWidth={2.4} />
+          <Text style={styles.floatingScanOrbText}>Quick Scan</Text>
+        </NativePressable>
+      </View>
+
 
       {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE SERVER SYNC ── */}
       <DashboardQRScannerModal
@@ -4851,5 +4622,298 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: '#94A3B8',
+  },
+
+  // ── Simplified Plant Dashboard Styles ──
+  dashboardContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 100,
+    gap: 16,
+  },
+  singleMasterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#056B4A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  singleStatCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  singleStatMainHeading: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  singleStatDateBadge: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  singleStatDateText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  singleStatNumberBlock: {
+    gap: 4,
+  },
+  singleStatHugeValue: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -1,
+  },
+  singleStatPrimaryTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  singleStatSubDescription: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+
+  // Hero Primary Scan Button
+  heroPrimaryScanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#056B4A',
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    shadowColor: '#056B4A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 8,
+    gap: 14,
+  },
+  heroPrimaryScanIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  heroPrimaryScanTextCol: {
+    flex: 1,
+  },
+  heroPrimaryScanTitle: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  heroPrimaryScanSubtitle: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12.5,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  heroPrimaryScanChevron: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Zone Status Bar
+  zoneStatusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  zoneStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  zoneStatusLabel: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  zoneStatusValue: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  zoneStatusChangeBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  zoneStatusChangeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  // Recent Scans Section
+  recentScansSection: {
+    marginTop: 4,
+    gap: 10,
+  },
+  recentScansHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  recentScansSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  recentScansCountText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  emptyRecentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  emptyRecentIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyRecentTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  emptyRecentSubtitle: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 260,
+  },
+  recentScansCardList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  recentScanItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  recentScanItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  recentScanCheckIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentScanInfoCol: {
+    flex: 1,
+  },
+  recentScanCodeText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  recentScanMetaText: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  recentScanTimeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginLeft: 8,
+  },
+
+  // Floating Bottom Scan Orb Bar
+  bottomFloatingContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 24 : 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 99,
+  },
+  floatingScanOrb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  floatingScanOrbText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
 });

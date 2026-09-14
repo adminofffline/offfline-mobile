@@ -52,13 +52,13 @@ export const plantApi = {
     accuracy?: number;
   }) => {
     const res = await api.post('/plant/qr/scan', data);
-    apiCache.invalidate(/plant_requests|plant_stats/);
+    apiCache.invalidate(/plant_requests|plant_stats|public_scan_audit|live_scans/);
     return res;
   },
 
   completeBottling: async (data: { campaign_id: string; plant_id?: string; location_name?: string }) => {
     const res = await api.post('/plant/qr/complete', data);
-    apiCache.invalidate(/plant_requests|plant_stats/);
+    apiCache.invalidate(/plant_requests|plant_stats|public_scan_audit|live_scans/);
     return res;
   },
 

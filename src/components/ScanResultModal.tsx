@@ -409,17 +409,21 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
               activeOpacity={0.85}
             >
               <QrCode size={18} color="#FFFFFF" />
-              <Text style={styles.scanNextBtnText}>Scan Next Bottle</Text>
+              <Text style={styles.scanNextBtnText}>
+                {isPlant ? 'Scan Next Can' : 'Scan Next Bottle'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.dismissBtn}
+              style={styles.doneScanningBtn}
               onPress={handleClosePress}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <Text style={styles.dismissBtnText}>Done / Close Viewfinder</Text>
+              <Check size={16} color="#FFFFFF" />
+              <Text style={styles.doneScanningBtnText}>Done Scanning</Text>
             </TouchableOpacity>
           </View>
+
         </Animated.View>
       </View>
     </Modal>
@@ -759,6 +763,22 @@ const styles = StyleSheet.create({
   scanNextBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  doneScanningBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#1E293B',
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  doneScanningBtnText: {
+    color: '#F8FAFC',
+    fontSize: 14,
     fontWeight: '700',
   },
   dismissBtn: {
