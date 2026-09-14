@@ -36,7 +36,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NativePressable } from './common/NativePressable';
 
-import { extractCleanQrId } from '../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, isValidQrId } from '../utils/locationProfiles';
 
 const { width } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(width - 64, 270);
@@ -57,9 +57,21 @@ export interface DashboardQRScannerModalProps {
     success?: boolean;
     message?: string;
     can_id?: string;
+    campaign_id?: string;
+    campaign_title?: string;
+    brand_name?: string;
+    plant_name?: string;
+    distributor_name?: string;
+    location_name?: string;
+    rate_per_unit?: number;
     current_count?: number;
+    allocated_quantity?: number;
     already_scanned?: boolean;
     is_rescan?: boolean;
+    plant_scan_required?: boolean;
+    code?: string;
+    qr_url?: string;
+    [key: string]: any;
   } | void> | void;
   onSimulateBulk?: (amount: number) => Promise<void> | void;
   onComplete?: (totalScannedInSession: number) => void;
@@ -77,8 +89,8 @@ export const DashboardQRScannerModal: React.FC<DashboardQRScannerModalProps> = (
   onSimulateBulk,
   onComplete,
   onPerformLiveScan,
-  title = 'Burst Scanner',
-  activeCampaignTitle,
+  title = 'Live Scanner',
+  activeCampaignTitle = 'All-Batch Can Verification',
   activeCampaignBrand,
   isPlant = true,
 }) => {
@@ -105,8 +117,8 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   onSimulateBulk,
   onComplete,
   onPerformLiveScan,
-  title = 'Burst Scanner',
-  activeCampaignTitle,
+  title = 'Live Scanner',
+  activeCampaignTitle = 'All-Batch Can Verification',
   activeCampaignBrand,
   isPlant,
 }) => {
@@ -129,6 +141,9 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   const cameraDevice = useCameraDevice(cameraPosition);
   const recentCodesRef = useRef<Map<string, number>>(new Map());
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
+  const sessionScannedUrlsRef = useRef<Set<string>>(new Set());
+  const verifiedCanIdsRef = useRef<Set<string>>(new Set());
+  const isProcessingRef = useRef(false);
   const hudTimerRef = useRef<any>(null);
 
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -206,13 +221,15 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   }, [laserAnim]);
 
   // Trigger pulse animation & transient badge on scan
-  const triggerScanFeedback = useCallback((code: string) => {
+  const triggerScanFeedback = useCallback((code: string, newCount?: number) => {
     ReactNativeHapticFeedback.trigger('impactHeavy', {
       enableVibrateFallback: true,
       ignoreAndroidSystemSettings: false,
     });
 
-    setSessionCount((prev) => prev + 1);
+    if (typeof newCount === 'number') {
+      setSessionCount(newCount);
+    }
     setLastScannedCode(code);
 
     // Pulse animation
@@ -262,6 +279,35 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
       }
 
       try {
+        // In continuous camera mode, avoid repeat triggers on the exact code/URL already processed in this active session
+        if (!isManual && (
+          sessionScannedUrlsRef.current.has(canonicalUrl) ||
+          sessionScannedCodesRef.current.has(cleanCode) ||
+          verifiedCanIdsRef.current.has(cleanCode)
+        )) {
+          ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
+          setLastScannedCode(cleanCode);
+          flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
+          return;
+        }
+
+        const now = Date.now();
+        const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
+        if (!isManual && now - lastScannedTime < 1500) {
+          return;
+        }
+        recentCodesRef.current.set(cleanCode, now);
+
+        // Immediate in-flight lock to drop concurrent frames before network response returns
+        sessionScannedUrlsRef.current.add(canonicalUrl);
+        sessionScannedCodesRef.current.add(cleanCode);
+
+        if (recentCodesRef.current.size > 50) {
+          recentCodesRef.current.forEach((time, c) => {
+            if (now - time > 10000) recentCodesRef.current.delete(c);
+          });
+        }
+
         const result = onScan(cleanCode);
         if (result && typeof (result as any).then === 'function') {
           const res = await result;
@@ -269,6 +315,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             const isDup = Boolean(res.already_scanned || res.is_rescan || res.success === false);
             if (isDup) {
               const dupCode = res.can_id || cleanCode;
+              sessionScannedUrlsRef.current.add(canonicalUrl);
               sessionScannedCodesRef.current.add(cleanCode);
               showDuplicatePopup(dupCode, res.message);
               return;
@@ -290,6 +337,19 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           flashHud('SUCCESS', `✓ Can ${cleanCode} Verified`, cleanCode);
         }
       } catch (err: any) {
+        const isPlantRequired =
+          err?.response?.data?.code === 'PLANT_SCAN_REQUIRED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('plant scan') ||
+          err?.response?.data?.error?.toLowerCase?.()?.includes('plant scan');
+
+        if (isPlantRequired) {
+          ReactNativeHapticFeedback.trigger('notificationError', { enableVibrateFallback: true });
+          setLastScannedCode(cleanCode);
+          const msg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
+          flashHud('ERROR', msg, cleanCode);
+          return;
+        }
+
         const isDup =
           err?.response?.status === 409 ||
           err?.response?.data?.already_scanned ||
@@ -297,6 +357,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
         if (isDup) {
+          sessionScannedUrlsRef.current.add(canonicalUrl);
           sessionScannedCodesRef.current.add(cleanCode);
           showDuplicatePopup(cleanCode, err?.response?.data?.message);
         } else {
@@ -304,6 +365,10 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
           triggerScanFeedback(cleanCode);
           flashHud('SUCCESS', `✓ Can ${cleanCode} Recorded`, cleanCode);
         }
+      } finally {
+        setTimeout(() => {
+          isProcessingRef.current = false;
+        }, 750);
       }
     },
     [duplicateModalData, onScan, showDuplicatePopup, triggerScanFeedback, flashHud]
@@ -334,9 +399,37 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     },
   });
 
+  const handleCompleteScanning = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+    if (onComplete) {
+      onComplete(sessionCount);
+    } else {
+      onClose();
+    }
+  }, [sessionCount, onComplete, onClose]);
+
+  const handleSwitchCamera = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
+    setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
+    setTorch(false);
+  }, []);
+
+  const handleToggleTorch = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
+    setTorch((prev) => !prev);
+  }, []);
+
   const handleSimulateBurst = useCallback(
     async (count: number = 1) => {
       ReactNativeHapticFeedback.trigger('impactHeavy', { enableVibrateFallback: true });
+
+      if (count === 1) {
+        const generatedCode = isPlant
+          ? `WA-PLT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 8999 + 1000)}`
+          : `CAN-60000${Math.floor(Math.random() * 9 + 1)}-${Math.floor(Math.random() * 89999 + 10000)}`;
+        processCode(generatedCode, true);
+        return;
+      }
 
       if (onSimulateBulk) {
         try {
@@ -358,26 +451,6 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     },
     [onSimulateBulk, isPlant, processCode, flashHud]
   );
-
-  const handleCompleteScanning = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
-    if (onComplete) {
-      onComplete(sessionCount);
-    } else {
-      onClose();
-    }
-  }, [sessionCount, onComplete, onClose]);
-
-  const handleSwitchCamera = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
-    setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
-    setTorch(false);
-  }, []);
-
-  const handleToggleTorch = useCallback(() => {
-    ReactNativeHapticFeedback.trigger('selection', { enableVibrateFallback: true });
-    setTorch((prev) => !prev);
-  }, []);
 
 
   const formattedTitle = formatCampaignTitle(activeCampaignTitle);

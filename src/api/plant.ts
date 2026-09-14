@@ -42,6 +42,7 @@ export const plantApi = {
 
   scanQr: async (data: {
     qr_id: string;
+    qr_url?: string;
     campaign_id?: string;
     plant_id?: string;
     plant_name?: string;

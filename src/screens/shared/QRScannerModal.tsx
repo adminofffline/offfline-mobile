@@ -262,7 +262,18 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           }
         }
       }
-    } catch {} finally {
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        (isPlant ? 'Plant bottling scan failed.' : 'Distribution delivery scan failed.');
+      setScanResultData((prev) => (prev ? {
+        ...prev,
+        status: 'ERROR',
+        title: '⚠️ Scan Failed',
+        message: errMsg,
+      } : null));
+    } finally {
       setIsSubmitting(false);
     }
   };

@@ -57,7 +57,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, resolveLocationGps, resolveLocationIp } from '../../utils/locationProfiles';
 import { plantApi } from '../../api/plant';
 import { brandApi } from '../../api/brand';
 import { adminApi } from '../../api/admin';
@@ -65,7 +65,6 @@ import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
 import { apiCache } from '../../api/cache';
-import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
 import { PoppedBottomSheetModal } from '../../components/PoppedBottomSheetModal';
 import { NativePressable } from '../../components/common/NativePressable';
@@ -942,9 +941,12 @@ export function PlantDashboardScreen({ navigation }: any) {
   const [bottledDispatchedCans, setBottledDispatchedCans] = useState(0);
   const [bottlingCommissionTotal, setBottlingCommissionTotal] = useState(0);
 
+  // Single Source of Truth for verified scanned can QR URLs
+  const [scannedQrUrls, setScannedQrUrls] = useState<Set<string>>(new Set());
+  const scannedQrUrlsRef = useRef<Set<string>>(new Set());
+
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
-  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1397,6 +1399,18 @@ export function PlantDashboardScreen({ navigation }: any) {
         const activeCamp = selectedScanCampaign || (orders && orders.length > 0 ? orders[0] : null);
         const cleanQr = extractCleanQrId(scannedCode) || String(scannedCode).trim();
         if (!cleanQr) return;
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
+
+        // Single Source of Truth: Prevent duplicate counting if canonical QR URL was already scanned
+        if (scannedQrUrlsRef.current.has(canonicalUrl)) {
+          return {
+            success: false,
+            already_scanned: true,
+            is_rescan: true,
+            can_id: cleanQr,
+            qr_url: canonicalUrl,
+          };
+        }
 
         // Immediate Duplicate Check (Prevents double counting for the same physical QR)
         if (scannedQrSetRef.current.has(cleanQr)) {
@@ -1948,26 +1962,18 @@ export function PlantDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE SERVER SYNC ── */}
       <DashboardQRScannerModal
         visible={showQrModal}
-        onClose={() => setShowQrModal(false)}
+        onClose={() => {
+          setShowQrModal(false);
+          setToastData(null);
+        }}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkPlant}
         onPerformLiveScan={handlePerformLiveScan}
-        title="Burst Scanner"
-        activeCampaignTitle={selectedScanCampaign?.campaign || orders[0]?.campaign}
-        activeCampaignBrand={selectedScanCampaign?.brand || orders[0]?.brand}
+        title="Live Scanner"
+        activeCampaignTitle={selectedScanCampaign ? selectedScanCampaign.campaign : 'All-Batch Can Verification'}
+        activeCampaignBrand={selectedScanCampaign ? selectedScanCampaign.brand : undefined}
         isPlant={true}
-      />
-
-      {/* ── Scan Result Output Popup Modal ── */}
-      <ScanResultModal
-        visible={!!scanResultData}
-        data={scanResultData}
-        onScanNext={() => setScanResultData(null)}
-        onClose={() => {
-          setScanResultData(null);
-          setShowQrModal(false);
-        }}
       />
 
       {/* ── MODAL 2: LOCATION PICKER (Apple Themed Redesign) ── */}
@@ -2305,36 +2311,12 @@ export function PlantDashboardScreen({ navigation }: any) {
                       <DocSheetIcon size={18} color="#0F172A" />
                     </View>
                     <View style={styles.statementSheetHeaderTitles}>
-                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1} ellipsizeMode="tail">
                         {displayTitle}
                       </Text>
-                      <View style={styles.sheetHeaderSubRow}>
-                        <Text style={styles.statementSheetRef} numberOfLines={1}>
-                          {currentDetailOrder.brand || 'Brand Partner'}
-                        </Text>
-                        <View
-                          style={[
-                            styles.minimalStatusPill,
-                            isCompleted ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
-                            { marginLeft: 8 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.minimalStatusDot,
-                              isCompleted ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.minimalStatusText,
-                              isCompleted ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
-                            ]}
-                          >
-                            {isCompleted ? 'Completed' : 'In Progress'}
-                          </Text>
-                        </View>
-                      </View>
+                      <Text style={styles.statementSheetRef} numberOfLines={1} ellipsizeMode="tail">
+                        {currentDetailOrder.brand || 'Brand Partner'}
+                      </Text>
                     </View>
                   </View>
                   <NativePressable
@@ -2352,7 +2334,32 @@ export function PlantDashboardScreen({ navigation }: any) {
                   <View style={styles.statementHeroCard}>
                     <View style={styles.sheetProgressTopRow}>
                       <Text style={styles.statementHeroLabel}>BOTTLING PROGRESS</Text>
-                      <Text style={[styles.statementHeroLabel, { color: isCompleted ? '#059669' : '#0F172A', fontWeight: '800' }]}>{progress}%</Text>
+                      <View style={styles.sheetProgressStatusGroup}>
+                        <View
+                          style={[
+                            styles.minimalStatusPill,
+                            isCompleted ? styles.minimalStatusPillSettled : styles.minimalStatusPillPending,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.minimalStatusDot,
+                              isCompleted ? styles.minimalStatusDotSettled : styles.minimalStatusDotPending,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.minimalStatusText,
+                              isCompleted ? styles.minimalStatusTextSettled : styles.minimalStatusTextPending,
+                            ]}
+                          >
+                            {isCompleted ? 'Completed' : 'In Progress'}
+                          </Text>
+                        </View>
+                        <Text style={[styles.statementHeroLabel, { color: isCompleted ? '#059669' : '#0F172A', fontWeight: '800' }]}>
+                          {progress}%
+                        </Text>
+                      </View>
                     </View>
                     <View style={styles.sheetProgressTrack}>
                       <View style={[styles.sheetProgressFill, { width: `${progress}%` }]} />
@@ -3687,6 +3694,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   statementSheetIconSquircle: {
     width: 36,
@@ -3697,9 +3706,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   statementSheetHeaderTitles: {
     flex: 1,
+    minWidth: 0,
   },
   statementSheetTitle: {
     fontSize: 15,
@@ -3711,6 +3722,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     color: '#64748B',
     marginTop: 1,
+    flexShrink: 1,
   },
   statementModalBody: {
     gap: 10,
@@ -3852,6 +3864,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   // ── Zone Selection List Items ──
@@ -4496,6 +4509,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  sheetProgressStatusGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sheetProgressLabel: {
     fontSize: 11,

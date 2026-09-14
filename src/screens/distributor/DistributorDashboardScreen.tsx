@@ -60,7 +60,7 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
-import { extractCleanQrId, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
+import { extractCleanQrId, toCanonicalQrUrl, resolveLocationGps, resolveDistributorIp } from '../../utils/locationProfiles';
 import { distributorApi } from '../../api/distributor';
 import { brandApi } from '../../api/brand';
 import { adminApi } from '../../api/admin';
@@ -68,7 +68,6 @@ import { paymentsApi } from '../../api/payments';
 import { authApi } from '../../api/auth';
 import { api } from '../../api/client';
 import { apiCache } from '../../api/cache';
-import { ScanResultModal, ScanResultData } from '../../components/ScanResultModal';
 import { LiquidGlassNavBar } from '../../components/LiquidGlassNavBar';
 import { PoppedBottomSheetModal } from '../../components/PoppedBottomSheetModal';
 import { NativePressable } from '../../components/common/NativePressable';
@@ -758,7 +757,6 @@ export function DistributorDashboardScreen({ navigation }: any) {
 
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);
-  const [scanResultData, setScanResultData] = useState<ScanResultData | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -790,8 +788,10 @@ export function DistributorDashboardScreen({ navigation }: any) {
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  // Scanner Simulator Count
+  // Scanner Simulator Count & Single Source of Truth
   const [scannerCount, setScannerCount] = useState(0);
+  const [scannedQrUrls, setScannedQrUrls] = useState<Set<string>>(new Set());
+  const scannedQrUrlsRef = useRef<Set<string>>(new Set());
 
   const triggerToast = useCallback((
     msg: string | ToastData,
@@ -888,6 +888,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
       }
 
       setScans(mappedScans);
+      const initialScannedUrls = new Set<string>();
+      mappedScans.forEach((m) => {
+        const canonical = toCanonicalQrUrl(m.can_id);
+        if (canonical) initialScannedUrls.add(canonical);
+      });
+      setScannedQrUrls(initialScannedUrls);
+      scannedQrUrlsRef.current = initialScannedUrls;
 
       // 2. Map Real Settlements from Production (strictly isolate DISTRIBUTOR role)
       const now = new Date();
@@ -1017,6 +1024,18 @@ export function DistributorDashboardScreen({ navigation }: any) {
       try {
         const cleanQr = extractCleanQrId(scannedCode);
         if (!cleanQr) return;
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
+
+        // Single Source of Truth: Check if canonical QR URL was already scanned/delivered
+        if (scannedQrUrlsRef.current.has(canonicalUrl)) {
+          return {
+            success: false,
+            already_scanned: true,
+            is_rescan: true,
+            can_id: cleanQr,
+            qr_url: canonicalUrl,
+          };
+        }
 
         // Immediate Duplicate Check (Prevents double counting for the same physical QR)
         if (scannedQrSetRef.current.has(cleanQr)) {
@@ -1041,21 +1060,15 @@ export function DistributorDashboardScreen({ navigation }: any) {
         if (res.data?.success) {
           const isRescan = Boolean(res.data.is_rescan || res.data.already_scanned);
           if (isRescan) {
-            const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
-            const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const dupScan: ScanRecord = {
-              id: res.data.scan_id || `SCN_DUP_${Date.now()}_${Math.random()}`,
-              can_id: canId,
-              campaign_title: res.data.campaign_title || res.data.campaign?.title || 'Live Delivery Batch',
-              location_name: res.data.location_name || 'Chennai Central Hub',
-              deliveryTime: formattedDeliveryTime,
-              payout_amount: 0.00,
-              status: 'ALREADY_SCANNED',
-            };
-            setScans((prev) => [dupScan, ...prev]);
-            triggerToast(`⚠️ Already Scanned: QR (${canId}) was already delivered!`);
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
             return res.data;
           }
+
+          // Record new unique QR URL into registry
+          scannedQrUrlsRef.current.add(canonicalUrl);
+          const updatedUrls = new Set(scannedQrUrlsRef.current);
+          setScannedQrUrls(updatedUrls);
 
           const canId = res.data.can_id || (cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`);
           const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1072,7 +1085,7 @@ export function DistributorDashboardScreen({ navigation }: any) {
           };
 
           setScans((prev) => [newScan, ...prev]);
-          setScannerCount((c) => c + 1);
+          setScannerCount(updatedUrls.size);
 
           // Add to distributor ledger
           const resolvedGps = resolveLocationGps(profileAddress || 'Chennai Central Hub');
@@ -1092,38 +1105,46 @@ export function DistributorDashboardScreen({ navigation }: any) {
           };
           setLedgerRecords((prev) => [newLedgerItem, ...prev]);
 
-          triggerToast(`✓ Can ${canId} delivered & verified!`);
           return res.data;
         }
         return res.data;
       } catch (err: any) {
+        const isPlantRequired =
+          err?.response?.data?.code === 'PLANT_SCAN_REQUIRED' ||
+          err?.response?.data?.message?.toLowerCase?.()?.includes('plant scan') ||
+          err?.response?.data?.error?.toLowerCase?.()?.includes('plant scan');
+
+        if (isPlantRequired) {
+          const plantMsg = err?.response?.data?.message || 'Plant scan pending — this QR has not been scanned by the Plant yet.';
+          return {
+            success: false,
+            plant_scan_required: true,
+            code: 'PLANT_SCAN_REQUIRED',
+            message: plantMsg,
+          };
+        }
+
         const isDup =
           err?.response?.status === 409 ||
           err?.response?.data?.already_scanned ||
           err?.response?.data?.code === 'QR_ALREADY_SCANNED' ||
           err?.response?.data?.message?.toLowerCase?.()?.includes('already');
 
+        const canonicalUrl = toCanonicalQrUrl(scannedCode);
         if (isDup) {
-          const canId = scannedCode.startsWith('CAN-') ? scannedCode : `CAN-${scannedCode.slice(-6).toUpperCase()}`;
-          const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const dupScan: ScanRecord = {
-            id: `SCN_DUP_${Date.now()}_${Math.random()}`,
-            can_id: canId,
-            campaign_title: 'Live Delivery Batch',
-            location_name: 'Chennai Central Hub',
-            deliveryTime: formattedDeliveryTime,
-            payout_amount: 0.00,
-            status: 'ALREADY_SCANNED',
-          };
-          setScans((prev) => [dupScan, ...prev]);
-          triggerToast(`⚠️ Already Scanned: QR (${scannedCode}) was already delivered!`);
-          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
+          if (canonicalUrl) {
+            scannedQrUrlsRef.current.add(canonicalUrl);
+            setScannedQrUrls(new Set(scannedQrUrlsRef.current));
+          }
+          return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode, qr_url: canonicalUrl };
         }
 
         console.warn('Distributor scan error:', err);
         return { success: false, message: err?.message };
       } finally {
-        isScanningRef.current = false;
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 1000);
       }
     },
     [getLocationSnapshot, profileAddress]
@@ -1145,10 +1166,13 @@ export function DistributorDashboardScreen({ navigation }: any) {
   const handleCompleteScanSession = useCallback((totalScannedInSession: number) => {
     setShowQrModal(false);
     if (totalScannedInSession > 0) {
-      triggerToast(`🎉 Batch of ${totalScannedInSession} deliveries recorded & verified!`);
-      loadProductionData().catch(() => {});
+      setTimeout(() => {
+        triggerToast(`🎉 Batch of ${totalScannedInSession.toLocaleString()} cans recorded & verified!`);
+      }, 400); // Wait for modal to fully close
+    } else {
+      setToastData(null);
     }
-  }, [loadProductionData]);
+  }, [triggerToast]);
 
   // ── Handle Real QR Scan Submission on Production ──
   const handlePerformLiveScan = useCallback(() => {
@@ -1745,25 +1769,17 @@ export function DistributorDashboardScreen({ navigation }: any) {
       {/* ── MODAL 1: LAZY DASHBOARD QR SCANNER WITH LIVE PRODUCTION SYNC ── */}
       <DashboardQRScannerModal
         visible={showQrModal}
-        onClose={() => setShowQrModal(false)}
+        onClose={() => {
+          setShowQrModal(false);
+          setToastData(null);
+        }}
         onComplete={handleCompleteScanSession}
         onScan={handleRealQrScanned}
         onSimulateBulk={handleSimulateBulkDistributor}
         onPerformLiveScan={handlePerformLiveScan}
-        title="Burst Scanner"
-        activeCampaignTitle="Live Delivery Batch"
+        title="Live Scanner"
+        activeCampaignTitle="All-Batch Can Verification"
         isPlant={false}
-      />
-
-      {/* ── Scan Result Output Popup Modal ── */}
-      <ScanResultModal
-        visible={!!scanResultData}
-        data={scanResultData}
-        onScanNext={() => setScanResultData(null)}
-        onClose={() => {
-          setScanResultData(null);
-          setShowQrModal(false);
-        }}
       />
 
       {/* ── MODAL 2: EDIT DISTRIBUTOR PROFILE (Optimized Non-Scrollable Apple Layout) ── */}
@@ -2125,36 +2141,12 @@ export function DistributorDashboardScreen({ navigation }: any) {
                       <BottleBadgeIcon size={18} color="#0F172A" />
                     </View>
                     <View style={styles.statementSheetHeaderTitles}>
-                      <Text style={styles.statementSheetTitle} numberOfLines={1}>
+                      <Text style={styles.statementSheetTitle} numberOfLines={1} ellipsizeMode="tail">
                         {currentRecord.can_id}
                       </Text>
-                      <View style={styles.sheetHeaderSubRow}>
-                        <Text style={styles.statementSheetRef} numberOfLines={1}>
-                          {currentRecord.campaign_title || 'General Batch'}
-                        </Text>
-                        <View
-                          style={[
-                            styles.minimalStatusPill,
-                            isDuplicate ? styles.appleDuplicatePill : styles.minimalStatusPillSettled,
-                            { marginLeft: 8 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.minimalStatusDot,
-                              isDuplicate ? styles.duplicateDot : styles.minimalStatusDotSettled,
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.minimalStatusText,
-                              isDuplicate ? styles.appleDuplicateText : styles.minimalStatusTextSettled,
-                            ]}
-                          >
-                            {isDuplicate ? 'Already Scanned' : 'Verified'}
-                          </Text>
-                        </View>
-                      </View>
+                      <Text style={styles.statementSheetRef} numberOfLines={1} ellipsizeMode="tail">
+                        {currentRecord.campaign_title || 'General Batch'}
+                      </Text>
                     </View>
                   </View>
                   <NativePressable
@@ -2192,6 +2184,27 @@ export function DistributorDashboardScreen({ navigation }: any) {
                           {isDuplicate
                             ? `Previously scanned & recorded • ${currentRecord.deliveryTime}`
                             : `Recorded ${currentRecord.deliveryTime}`}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.minimalStatusPill,
+                          isDuplicate ? styles.appleDuplicatePill : styles.minimalStatusPillSettled,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.minimalStatusDot,
+                            isDuplicate ? styles.duplicateDot : styles.minimalStatusDotSettled,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.minimalStatusText,
+                            isDuplicate ? styles.appleDuplicateText : styles.minimalStatusTextSettled,
+                          ]}
+                        >
+                          {isDuplicate ? 'Duplicate' : 'Verified'}
                         </Text>
                       </View>
                     </View>
@@ -3393,6 +3406,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   statementSheetIconSquircle: {
     width: 36,
@@ -3403,9 +3418,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   statementSheetHeaderTitles: {
     flex: 1,
+    minWidth: 0,
   },
   statementSheetTitle: {
     fontSize: 15,
@@ -3417,6 +3434,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     color: '#64748B',
     marginTop: 1,
+    flexShrink: 1,
   },
   statementModalBody: {
     gap: 10,
@@ -3558,6 +3576,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   settleBadgeTextGreen: {
     color: '#047857',

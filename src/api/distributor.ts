@@ -32,6 +32,7 @@ export const distributorApi = {
 
   scanQr: async (data: {
     qr_id: string;
+    qr_url?: string;
     campaign_id?: string;
     batch_id?: string;
     latitude?: number;
@@ -39,7 +40,7 @@ export const distributorApi = {
     accuracy?: number;
   }) => {
     const res = await api.post('/distributor/qr/scan', data);
-    apiCache.invalidate(/distributor_scans|distributor_dashboard|distributor_today_scans/);
+    apiCache.invalidate(/distributor_scans|distributor_dashboard|distributor_today_scans|public_scan_audit|live_scans/);
     return res;
   },
 

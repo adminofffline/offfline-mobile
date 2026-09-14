@@ -68,6 +68,7 @@ export interface ScanResultModalProps {
   data: ScanResultData | null;
   onScanNext: () => void;
   onClose: () => void;
+  useNativeModal?: boolean;
 }
 
 export const ScanResultModal: React.FC<ScanResultModalProps> = ({
@@ -75,6 +76,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   data,
   onScanNext,
   onClose,
+  useNativeModal = true,
 }) => {
   const [copied, setCopied] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -151,20 +153,14 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
     ? Math.min(100, Math.round((data.currentCount / data.allocatedQuantity) * 100))
     : null;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onScanNext}
-    >
-      <View style={styles.overlay}>
-        {/* Backdrop touch to dismiss popup & scan next */}
-        <TouchableOpacity
-          style={styles.backdropTouch}
-          activeOpacity={1}
-          onPress={handleScanNextPress}
-        />
+  const modalBody = (
+    <View style={[styles.overlay, !useNativeModal && StyleSheet.absoluteFill]}>
+      {/* Backdrop touch to dismiss popup & scan next */}
+      <TouchableOpacity
+        style={styles.backdropTouch}
+        activeOpacity={1}
+        onPress={handleScanNextPress}
+      />
 
         <Animated.View
           style={[
@@ -426,6 +422,20 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
 
         </Animated.View>
       </View>
+  );
+
+  if (!useNativeModal) {
+    return modalBody;
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onScanNext}
+    >
+      {modalBody}
     </Modal>
   );
 };

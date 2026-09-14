@@ -9,7 +9,7 @@ import {
   Easing,
   PanResponder,
 } from 'react-native';
-import { X, Check } from 'lucide-react-native';
+import { X, Check, AlertTriangle } from 'lucide-react-native';
 import Svg, { Circle, Rect, Path } from 'react-native-svg';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NativePressable } from './NativePressable';
@@ -235,7 +235,8 @@ export const AppleCelebrationToast: React.FC<AppleCelebrationToastProps> = ({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [toastData, translateY, opacity, scale, iconScale, confettiAnim, dismiss]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toastData]);
 
   if (!toastData) return null;
 
@@ -265,6 +266,19 @@ export const AppleCelebrationToast: React.FC<AppleCelebrationToastProps> = ({
 
     return <Text style={styles.titleNavyText}>{toastData.title}</Text>;
   };
+
+  const isWarning = Boolean(
+    toastData.title.includes('⚠️') ||
+    toastData.subtitle?.includes('⚠️') ||
+    toastData.title.toLowerCase().includes('already') ||
+    toastData.title.toLowerCase().includes('pending')
+  );
+  const isError = Boolean(
+    toastData.title.includes('❌') ||
+    toastData.subtitle?.includes('❌') ||
+    toastData.title.toLowerCase().includes('failed') ||
+    toastData.title.toLowerCase().includes('error')
+  );
 
   return (
     <View style={styles.toastOverlayContainer} pointerEvents="box-none">
@@ -350,16 +364,24 @@ export const AppleCelebrationToast: React.FC<AppleCelebrationToastProps> = ({
         {/* Soft Ambient Inner Gradient Tint */}
         <View style={styles.pillShineBg} pointerEvents="none" />
 
-        {/* Left Circular Emerald Check Badge */}
+        {/* Left Circular Badge (Emerald Check / Warning Amber / Error Red) */}
         <Animated.View
           style={[
             styles.emeraldCircleBadge,
+            isWarning && styles.warningCircleBadge,
+            isError && styles.errorCircleBadge,
             {
               transform: [{ scale: iconScale }],
             },
           ]}
         >
-          <Check color="#FFFFFF" size={18} strokeWidth={3.2} />
+          {isWarning ? (
+            <AlertTriangle color="#FFFFFF" size={17} strokeWidth={2.6} />
+          ) : isError ? (
+            <X color="#FFFFFF" size={17} strokeWidth={3} />
+          ) : (
+            <Check color="#FFFFFF" size={18} strokeWidth={3.2} />
+          )}
         </Animated.View>
 
         {/* Center Text Container */}
@@ -435,6 +457,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  warningCircleBadge: {
+    backgroundColor: '#D97706',
+    shadowColor: '#D97706',
+  },
+  errorCircleBadge: {
+    backgroundColor: '#DC2626',
+    shadowColor: '#DC2626',
   },
   textColumn: {
     justifyContent: 'center',
