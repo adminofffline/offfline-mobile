@@ -1401,6 +1401,18 @@ export function PlantDashboardScreen({ navigation }: any) {
         // Immediate Duplicate Check (Prevents double counting for the same physical QR)
         if (scannedQrSetRef.current.has(cleanQr)) {
           triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+          setScanResultData({
+            status: 'DUPLICATE',
+            qrId: cleanQr,
+            canId: cleanQr,
+            campaignTitle: activeCamp?.campaign || 'Water Bottling Production',
+            brandName: activeCamp?.brand || 'Offfline Verified',
+            plantName: plantProfileName || 'Water Plant Facility',
+            locationName: activeCamp?.location || currentLocationDisplay,
+            scanType: 'PLANT',
+            title: '⚠️ Already Scanned',
+            message: 'This QR code has already been scanned and bottled. Each can can only be scanned once by the Plant.',
+          });
           return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
         }
         scannedQrSetRef.current.add(cleanQr);
@@ -1440,8 +1452,21 @@ export function PlantDashboardScreen({ navigation }: any) {
 
               if (isDupRetry) {
                 triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+                setScanResultData({
+                  status: 'DUPLICATE',
+                  qrId: cleanQr,
+                  canId: cleanQr,
+                  campaignTitle: activeCamp?.campaign || 'Water Bottling Production',
+                  brandName: activeCamp?.brand || 'Offfline Verified',
+                  plantName: plantProfileName || 'Water Plant Facility',
+                  locationName: activeCamp?.location || currentLocationDisplay,
+                  scanType: 'PLANT',
+                  title: '⚠️ Already Scanned',
+                  message: retryErr?.response?.data?.message || 'This QR code has already been scanned and bottled. Each can can only be scanned once by the Plant.',
+                });
                 return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
               }
+              return { success: false, message: retryErr?.message };
             }
           } else {
             const isDup =
@@ -1452,15 +1477,40 @@ export function PlantDashboardScreen({ navigation }: any) {
 
             if (isDup) {
               triggerToast(`⚠️ Already Scanned: QR (${cleanQr}) was already recorded!`);
+              setScanResultData({
+                status: 'DUPLICATE',
+                qrId: cleanQr,
+                canId: cleanQr,
+                campaignTitle: activeCamp?.campaign || 'Water Bottling Production',
+                brandName: activeCamp?.brand || 'Offfline Verified',
+                plantName: plantProfileName || 'Water Plant Facility',
+                locationName: activeCamp?.location || currentLocationDisplay,
+                scanType: 'PLANT',
+                title: '⚠️ Already Scanned',
+                message: apiErr?.response?.data?.message || 'This QR code has already been scanned and bottled. Each can can only be scanned once by the Plant.',
+              });
               return { success: false, already_scanned: true, is_rescan: true, can_id: cleanQr };
             }
+            return { success: false, message: apiErr?.message };
           }
         }
 
-        const isRescan = Boolean(serverRes?.data?.is_rescan || serverRes?.data?.already_scanned);
+        const isRescan = Boolean(serverRes?.data?.is_rescan || serverRes?.data?.already_scanned || serverRes?.data?.success === false);
         if (isRescan) {
           const dupCanId = serverRes?.data?.can_id || cleanQr;
           triggerToast(`⚠️ Already Scanned: QR (${dupCanId}) was already recorded!`);
+          setScanResultData({
+            status: 'DUPLICATE',
+            qrId: dupCanId,
+            canId: dupCanId,
+            campaignTitle: activeCamp?.campaign || 'Water Bottling Production',
+            brandName: activeCamp?.brand || 'Offfline Verified',
+            plantName: plantProfileName || 'Water Plant Facility',
+            locationName: activeCamp?.location || currentLocationDisplay,
+            scanType: 'PLANT',
+            title: '⚠️ Already Scanned',
+            message: serverRes?.data?.message || 'This QR code has already been scanned and bottled. Each can can only be scanned once by the Plant.',
+          });
           return { success: false, already_scanned: true, is_rescan: true, can_id: dupCanId };
         }
 

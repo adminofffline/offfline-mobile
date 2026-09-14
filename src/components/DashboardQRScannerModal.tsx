@@ -121,6 +121,10 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     message: string;
     canId?: string;
   }>({ status: 'IDLE', message: 'Ready to scan' });
+  const [duplicateModalData, setDuplicateModalData] = useState<{
+    canId: string;
+    message: string;
+  } | null>(null);
 
   const cameraDevice = useCameraDevice(cameraPosition);
   const recentCodesRef = useRef<Map<string, number>>(new Map());
@@ -137,13 +141,32 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
     setHudFeedback({ status, message, canId });
     hudTimerRef.current = setTimeout(() => {
       setHudFeedback({ status: 'IDLE', message: 'Ready to scan' });
-    }, status === 'SUCCESS' ? 1200 : 2000);
+    }, status === 'SUCCESS' ? 1200 : 2500);
   }, []);
+
+  // Show high-impact Duplicate Popup dialog
+  const showDuplicatePopup = useCallback(
+    (code: string, customMsg?: string) => {
+      ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
+      setLastScannedCode(code);
+      setDuplicateModalData({
+        canId: code,
+        message:
+          customMsg ||
+          (isPlant
+            ? 'This QR code has already been scanned and bottled. Each can can only be scanned once by the Plant.'
+            : 'This QR code has already been scanned and delivered. Each can can only be scanned once by the Distributor.'),
+      });
+      flashHud('DUPLICATE', `⚠️ Already Scanned: ${code}`, code);
+    },
+    [isPlant, flashHud]
+  );
 
   // Automatically request camera permission and reset session tracking on mount
   useEffect(() => {
     sessionScannedCodesRef.current.clear();
     recentCodesRef.current.clear();
+    setDuplicateModalData(null);
     if (!hasPermission) {
       requestPermission();
     }
@@ -214,17 +237,21 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
   // Process a scanned code through extractCleanQrId and onScan
   const processCode = useCallback(
     async (rawVal: string, isManual = false) => {
+      // If duplicate dialog is currently showing, ignore camera stream until user dismisses
+      if (duplicateModalData != null) return;
+
       const cleanCode = extractCleanQrId(rawVal) || String(rawVal).trim();
       if (!cleanCode || cleanCode.length < 1) return;
 
-      // In continuous camera mode, avoid repeat triggers on the exact code already processed in this active session
+      // If already processed in this continuous session, immediately trigger the Already Scanned popup!
       if (!isManual && sessionScannedCodesRef.current.has(cleanCode)) {
+        showDuplicatePopup(cleanCode);
         return;
       }
 
       const now = Date.now();
       const lastScannedTime = recentCodesRef.current.get(cleanCode) || 0;
-      if (!isManual && now - lastScannedTime < 3000) return;
+      if (!isManual && now - lastScannedTime < 2500) return;
       recentCodesRef.current.set(cleanCode, now);
       sessionScannedCodesRef.current.add(cleanCode);
 
@@ -243,16 +270,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             if (isDup) {
               const dupCode = res.can_id || cleanCode;
               sessionScannedCodesRef.current.add(cleanCode);
-              ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
-              setLastScannedCode(dupCode);
-              badgeAnim.setValue(1);
-              Animated.timing(badgeAnim, {
-                toValue: 0,
-                duration: 2500,
-                delay: 1200,
-                useNativeDriver: true,
-              }).start();
-              flashHud('DUPLICATE', `⚠️ Already Scanned: ${dupCode}`, dupCode);
+              showDuplicatePopup(dupCode, res.message);
               return;
             }
 
@@ -280,16 +298,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
 
         if (isDup) {
           sessionScannedCodesRef.current.add(cleanCode);
-          ReactNativeHapticFeedback.trigger('notificationWarning', { enableVibrateFallback: true });
-          setLastScannedCode(cleanCode);
-          badgeAnim.setValue(1);
-          Animated.timing(badgeAnim, {
-            toValue: 0,
-            duration: 2500,
-            delay: 1200,
-            useNativeDriver: true,
-          }).start();
-          flashHud('DUPLICATE', `⚠️ Already Scanned: ${cleanCode}`, cleanCode);
+          showDuplicatePopup(cleanCode, err?.response?.data?.message);
         } else {
           sessionScannedCodesRef.current.add(cleanCode);
           triggerScanFeedback(cleanCode);
@@ -297,7 +306,7 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
         }
       }
     },
-    [onScan, triggerScanFeedback, flashHud]
+    [duplicateModalData, onScan, showDuplicatePopup, triggerScanFeedback, flashHud]
   );
 
   // VisionCamera code scanner strictly for physical QR codes inside the scanning reticle
@@ -655,6 +664,56 @@ const ActiveScannerContent: React.FC<Omit<DashboardQRScannerModalProps, 'visible
             </TouchableOpacity>
           </View>
         </SafeAreaView>
+
+        {/* ── 4. PROMINENT ALREADY SCANNED DUPLICATE POPUP MODAL ── */}
+        {duplicateModalData && (
+          <View style={styles.duplicateModalBackdrop}>
+            <View style={styles.duplicateModalCard}>
+              <View style={styles.duplicateIconSquircle}>
+                <AlertTriangle size={34} color="#D97706" strokeWidth={2.5} />
+              </View>
+
+              <Text style={styles.duplicateModalHeader}>Already Scanned</Text>
+
+              <View style={styles.duplicateCodePill}>
+                <QrCode size={13} color="#D97706" />
+                <Text style={styles.duplicateCodePillText} numberOfLines={1}>
+                  {duplicateModalData.canId}
+                </Text>
+              </View>
+
+              <Text style={styles.duplicateModalBodyText}>
+                {duplicateModalData.message}
+              </Text>
+
+              <View style={styles.duplicateActionsRow}>
+                <TouchableOpacity
+                  style={styles.duplicateScanNextButton}
+                  onPress={() => {
+                    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+                    setDuplicateModalData(null);
+                  }}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.duplicateScanNextButtonText}>Scan Next Bottle</Text>
+                  <ArrowRight size={16} color="#FFFFFF" strokeWidth={2.4} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.duplicateDismissButton}
+                  onPress={() => {
+                    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+                    setDuplicateModalData(null);
+                    handleCompleteScanning();
+                  }}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.duplicateDismissButtonText}>Done Scanning</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -1096,6 +1155,112 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '800',
     letterSpacing: -0.2,
+  },
+
+  // ── Duplicate Already Scanned Modal Styles ──
+  duplicateModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 10, 14, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    zIndex: 9999,
+  },
+  duplicateModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#131E24',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(217, 119, 6, 0.4)',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  duplicateIconSquircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(217, 119, 6, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  duplicateModalHeader: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#F59E0B',
+    letterSpacing: -0.3,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  duplicateCodePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.25)',
+    marginBottom: 14,
+    maxWidth: '90%',
+  },
+  duplicateCodePillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FCD34D',
+    letterSpacing: 0.2,
+  },
+  duplicateModalBodyText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  duplicateActionsRow: {
+    width: '100%',
+    gap: 10,
+  },
+  duplicateScanNextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#D97706',
+    paddingVertical: 13,
+    borderRadius: 14,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  duplicateScanNextButtonText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.1,
+  },
+  duplicateDismissButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  duplicateDismissButtonText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
 });
 

@@ -1120,43 +1120,8 @@ export function DistributorDashboardScreen({ navigation }: any) {
           return { success: false, already_scanned: true, is_rescan: true, can_id: scannedCode };
         }
 
-        const canId = cleanQr.startsWith('CAN-') ? cleanQr : `CAN-${cleanQr.slice(-6).toUpperCase()}`;
-        const formattedDeliveryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const payoutVal = 10.00;
-
-        const newScan: ScanRecord = {
-          id: `SCN_${Date.now()}_${Math.random()}`,
-          can_id: canId,
-          campaign_title: 'Live Delivery Batch',
-          location_name: 'Chennai Central Hub',
-          deliveryTime: formattedDeliveryTime,
-          payout_amount: payoutVal,
-          status: 'VERIFIED',
-        };
-
-        setScans((prev) => [newScan, ...prev.filter((p) => p.can_id !== canId)]);
-        setScannerCount((c) => c + 1);
-
-        // Add to distributor ledger
-        const resolvedGps = resolveLocationGps(profileAddress || 'Chennai Central Hub');
-        const todayDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const newLedgerItem: SettlementRecord = {
-          id: `DIST-${Date.now().toString().slice(-4)}`,
-          campaignTitle: 'Live Delivery Batch',
-          brandName: 'Offfline Advertiser',
-          bottlesCount: 1,
-          commission: payoutVal,
-          deliveryDate: todayDateStr,
-          deliveryTime: formattedDeliveryTime,
-          locationTitle: profileAddress || 'Chennai Central Hub',
-          gpsCoords: `${resolvedGps.lat.toFixed(4)}° N, ${resolvedGps.lng.toFixed(4)}° E`,
-          ipAddress: '127.0.0.1 (Local Node)',
-          settlementStatus: 'SETTLED',
-        };
-        setLedgerRecords((prev) => [newLedgerItem, ...prev]);
-
-        triggerToast(`✓ Can ${canId} delivered & verified!`);
-        return { success: true, can_id: canId };
+        console.warn('Distributor scan error:', err);
+        return { success: false, message: err?.message };
       } finally {
         isScanningRef.current = false;
       }
